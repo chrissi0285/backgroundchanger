@@ -1,35 +1,37 @@
 <?xml version="1.0"?>
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
-    <id>unsplash</id>
-    <name>Splash</name>
-    <summary>📸🔀☁️ Random background from Unsplash</summary>
-    <summary lang="de">📸🔀☁️ Zufällige Hintergrundbilder von Unsplash</summary>
-    <description>Show a new random featured nature photo in your nextcloud. Now with choosable motives!</description>
-    <description lang="de">Zeigt ein zufällig ausgewähltes Naturfoto in ihrer Nextcloud. Jetzt auch mit selbstwählbaren Motiven!</description>
-    <version>3.2.0</version>
+    <id>wechselbild</id>
+    <name>Wechselbild</name>
+    <summary>Rotating, locally cached Wikimedia Commons backgrounds</summary>
+    <summary lang="de">Wechselnde, lokal gespeicherte Wikimedia-Commons-Hintergründe</summary>
+    <description><![CDATA[
+Shows a different curated landscape on each page load. Images are fetched
+sparingly, validated, cached locally and accompanied by author, license and
+source attribution. The last valid images remain available while offline.
+    ]]></description>
+    <description lang="de"><![CDATA[
+Zeigt bei jedem Seitenaufruf eine andere kuratierte Landschaft. Bilder werden
+sparsam abgerufen, geprüft, lokal gespeichert und mit Urheber, Lizenz und
+Quelle ausgewiesen. Die letzten gültigen Bilder bleiben offline verfügbar.
+    ]]></description>
+    <version>1.0.0</version>
     <licence>agpl</licence>
-    <author homepage="https://jancborchardt.net">Jan C. Borchardt</author>
-    <author homepage="https://github.com/marius-wieschollek">Marius Wieschollek</author>
-    <author homepage="https://github.com/newhinton">Felix Nüsse</author>
-    <namespace>Unsplash</namespace>
+    <author homepage="https://github.com/chrissi0285">Christian</author>
+    <namespace>Wechselbild</namespace>
     <category>customization</category>
     <category>multimedia</category>
-    <category>tools</category>
-    <website>https://github.com/nextcloud/unsplash/</website>
-    <bugs>https://github.com/nextcloud/unsplash/issues</bugs>
-    <repository type="git">https://github.com/nextcloud/unsplash.git</repository>
-    <screenshot>https://raw.githubusercontent.com/nextcloud/unsplash/master/.meta/unsplash.jpg</screenshot>
-    <screenshot>https://raw.githubusercontent.com/nextcloud/unsplash/master/.meta/unsplash-header.jpg</screenshot>
+    <website>https://github.com/chrissi0285/wechselbild</website>
+    <bugs>https://github.com/chrissi0285/wechselbild/issues</bugs>
+    <repository type="git">https://github.com/chrissi0285/wechselbild.git</repository>
     <dependencies>
         <php min-version="8.2" max-version="8.5"/>
-        <nextcloud min-version="31" max-version="33"/>
+        <nextcloud min-version="34" max-version="34"/>
     </dependencies>
-    <settings>
-        <admin>OCA\Unsplash\Settings\AdminSettings</admin>
-        <personal>OCA\Unsplash\Settings\PersonalSettings</personal>
-    </settings>
     <background-jobs>
-        <job>OCA\Unsplash\Cron\ImageProviderBackgroundFetch</job>
+        <job>OCA\Wechselbild\Cron\RefreshBackgrounds</job>
     </background-jobs>
+    <commands>
+        <command>OCA\Wechselbild\Command\Refresh</command>
+    </commands>
 </info>

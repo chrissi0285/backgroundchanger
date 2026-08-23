@@ -3,50 +3,22 @@
 declare(strict_types=1);
 
 /**
- * This file is part of the Unsplash App
- * and licensed under the AGPL.
+ * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 return [
 	'routes' => [
-		// AdminSettingsController
 		[
-			'name' => 'admin_settings#set',
-			'url' => '/settings/admin/set',
-	   		'verb' => 'POST'
+			'name' => 'background#select',
+			'url' => '/api/background',
+			'verb' => 'GET',
 		],
 		[
-			'name' => 'admin_settings#getCustomization',
-			'url' => '/settings/admin/getCustomization/{providername}',
-			'verb' => 'GET'
+			'name' => 'background#image',
+			'url' => '/api/image/{id}',
+			'verb' => 'GET',
+			'requirements' => ['id' => '[a-f0-9]{32}'],
 		],
-		// Personal settings (TODO: clean-up / currently unused?)
-		[
-			'name' => 'personal_settings#set', 
-			'url' => '/settings/personal/set',
-			'verb' => 'POST'
-		],
-		// CssController
-		[
-			'name' => 'css#login',
-			'url' => '/api/login.css',
-			'verb' => 'GET'
-		],
-		[
-			'name' => 'css#dashboard',
-			'url' => '/api/dashboard.css',
-			'verb' => 'GET'
-		],
-		// ImageController
-		[
-			'name' => 'image#get',
-			'url' => '/api/image',
-			'verb' => 'GET'
-		],
-		[
-			'name' => 'image#getMetadata',
-			'url' => '/api/metadata',
-			'verb' => 'GET'
-   		],
 	],
 ];

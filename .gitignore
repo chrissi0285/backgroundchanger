@@ -1,5 +1,2 @@
-build
-node_modules
-unsplash
-/test-results/
-/playwright-report/
+/build/
+/vendor/
