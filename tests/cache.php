@@ -17,8 +17,12 @@ if (!interface_exists(IAppData::class)) {
 	throw new RuntimeException('Load the Nextcloud bootstrap before this test');
 }
 
-require_once __DIR__ . '/../lib/Service/MetadataPolicy.php';
-require_once __DIR__ . '/../lib/Service/CacheService.php';
+if (!class_exists(\OCA\Wechselbild\Service\MetadataPolicy::class, false)) {
+	require_once __DIR__ . '/../lib/Service/MetadataPolicy.php';
+}
+if (!class_exists(CacheService::class, false)) {
+	require_once __DIR__ . '/../lib/Service/CacheService.php';
+}
 
 final class MemoryFile implements ISimpleFile {
 	private int $mtime;

@@ -48,7 +48,7 @@ final class CommonsService {
 				'gcmstartsortkeyprefix' => $prefix,
 				'prop' => 'imageinfo',
 				'iiprop' => 'url|mime|size|extmetadata',
-				'iiurlwidth' => 2560,
+				'iiurlwidth' => MetadataPolicy::REQUEST_WIDTH,
 				'iiextmetadatalanguage' => 'en',
 				'iiextmetadatafilter' => 'Artist|ImageDescription|LicenseShortName|Restrictions',
 				'maxlag' => 5,
@@ -98,12 +98,16 @@ final class CommonsService {
 	 */
 	public function download(array $candidate): array {
 		$imageUrl = is_string($candidate['imageUrl'] ?? null) ? $candidate['imageUrl'] : '';
-		if (!MetadataPolicy::isImageUrl($imageUrl)) {
+		$candidateMime = is_string($candidate['mime'] ?? null) ? $candidate['mime'] : '';
+		if (!MetadataPolicy::isImageUrl($imageUrl)
+			|| MetadataPolicy::extensionForMime($candidateMime) === null) {
 			throw new \RuntimeException('Rejected image host');
 		}
 
 		$response = $this->client->get($imageUrl, [
-			'headers' => $this->headers('image/avif,image/webp,image/png,image/jpeg'),
+			// Do not invite Commons content negotiation to return a different
+			// format than the metadata record we already validated.
+			'headers' => $this->headers($candidateMime),
 			'timeout' => 30,
 			'allow_redirects' => false,
 			'stream' => true,
@@ -123,10 +127,11 @@ final class CommonsService {
 		}
 		$mime = strtolower((string)($imageInfo['mime'] ?? ''));
 		$extension = MetadataPolicy::extensionForMime($mime);
-		if ($extension === null
-			|| $mime !== ($candidate['mime'] ?? '')
-			|| !MetadataPolicy::isLandscape((int)$imageInfo[0], (int)$imageInfo[1])) {
-			throw new \RuntimeException('Commons image type or dimensions were rejected');
+		if ($extension === null || $mime !== $candidateMime) {
+			throw new \RuntimeException('Commons image type was rejected');
+		}
+		if (!MetadataPolicy::isLandscape((int)$imageInfo[0], (int)$imageInfo[1])) {
+			throw new \RuntimeException('Commons image dimensions were rejected');
 		}
 
 		$candidate['body'] = $body;

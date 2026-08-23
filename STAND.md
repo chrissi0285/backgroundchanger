@@ -74,6 +74,8 @@ Quellbäume geprüft:
 - Eigener Identifier und Namensraum: `wechselbild` / `OCA\Wechselbild`.
 - Quelle: ausschließlich die offizielle Commons-Kategorie
   `Featured pictures of landscapes` über die MediaWiki-API.
+- Die App fordert feste 1920-Pixel-Vorschaubilder an. Größere Anforderungen
+  würden bei Commons teils unnötige 3840-Pixel-Cachedateien ausliefern.
 - Nur JPEG, PNG oder WebP, echte Landschaftsformate, HTTPS-Quellen und eine
   explizit erlaubte freie Lizenz werden angenommen. Antwortgröße, Bildsignatur,
   Abmessungen, Metadaten und Anbieter-Host werden geprüft.
@@ -124,13 +126,37 @@ Quellbäume geprüft:
 
 ## Letzter sicherer Checkpoint
 
-Recherche, Architekturentscheidung und der erste vollständige Quellstand sind
-abgeschlossen. Auf der produktiven PHP-8.5-/Nextcloud-34-Laufzeit bestanden
-alle PHP-Syntaxprüfungen sowie 29 reine Metadaten- und 21 speicherinterne
-Cacheprüfungen ohne Installation oder Dateischreibzugriff auf Nextcloud.
-JavaScript-, XML-, Shell-, Identitäts-, Geheimnis- und Diff-Prüfungen sind
-ebenfalls fehlerfrei. Produktiv und RUNI wurden noch nicht verändert.
+Recherche, Architekturentscheidung, Quellstand und der vollständige isolierte
+RUNI-Test sind abgeschlossen. Produktiv wurde nicht verändert.
 
-Nächster Pflichtschritt ist der isolierte RUNI-Test mit einer vollständigen
-Nextcloud-34-Installation, echten Commons-Bildern, Fehlerfällen, Neustart,
-Offline-Betrieb und visueller Browserprüfung.
+- Der unprivilegierte Gast `wechselbild-nc34-test` lief mit `onboot=0`, Ubuntu
+  26.04, PHP 8.5.4, MariaDB 11.8.6, Apache 2.4.66, Redis 8.0.5 und dem per
+  SHA-256 und PGP geprüften Nextcloud 34.0.3.2.
+- 36 Metadaten-/Identitätsprüfungen und 21 speicherinterne Cachetests sowie
+  sämtliche PHP-, JavaScript-, XML-, Shell- und Paketprüfungen bestanden.
+- Der erste reale Providerlauf zeigte, dass eine 2560-Pixel-Anforderung bei
+  Commons teils 3840-Pixel-Dateien ausliefert. Die korrigierte feste
+  1920-Pixel-Anforderung lieferte anschließend vier Initialbilder und weitere
+  Einzelbilder ohne Zurückweisung. Die Begrenzung blieb bei acht sichtbaren
+  Cacheeinträgen.
+- Auswahl-, Bild-, 404-, 405-, Cache-Header-, Hintergrundjob-, Neustart- und
+  Wiederanlauftests bestanden. Nach einem sauberen Logmarker entstanden bei
+  erneutem echten Abruf keine Warnungen oder Fehler; die Core-Integrität blieb
+  fehlerfrei.
+- Ohne Standardroute war Commons nachweislich unerreichbar, Nextcloud samt
+  Login, Auswahl und lokalen Bildern aber weiter nutzbar. Chrome zeigte bei
+  Login, Dashboard und Dateien drei verschiedene Bilder und erzeugte fünf
+  lokale Auswahl- sowie fünf lokale Bildabrufe, keinen Anbieteraufruf und
+  keine JavaScript-Ausnahme. Die Screenshots wurden tatsächlich angesehen;
+  Kontrast, Navigation, Formulare und Klickziele blieben nutzbar.
+- Ein testweise gesetzter persönlicher Nextcloud-Hintergrund unterdrückte
+  Wechselbild vollständig und ohne Netzaufruf. Der vorher nicht vorhandene
+  Benutzerwert wurde danach wieder exakt gelöscht.
+
+Der öffentliche Quellstand liegt unter
+<https://github.com/chrissi0285/wechselbild>. Der DCO-geprüfte offizielle
+Zertifikatsantrag ist [Nextcloud-PR 1181](https://github.com/nextcloud/app-certificate-requests/pull/1181).
+Der private 4096-Bit-Schlüssel liegt ausschließlich mit Modus 600 unter
+`/home/chrissi/llmo/secrets/wechselbild.key`. Solange Nextcloud den PR nicht
+freigegeben hat, wird bewusst kein Paket als signiert ausgegeben und nichts
+produktiv installiert.

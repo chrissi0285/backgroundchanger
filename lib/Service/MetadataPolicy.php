@@ -11,6 +11,7 @@ namespace OCA\Wechselbild\Service;
 
 final class MetadataPolicy {
 	public const MAX_TEXT_LENGTH = 300;
+	public const REQUEST_WIDTH = 1920;
 	public const MIN_WIDTH = 1600;
 	public const MIN_HEIGHT = 720;
 	public const MAX_WIDTH = 3000;

@@ -10,6 +10,7 @@ internet outage does not remove the background or impair the Nextcloud UI.
 - Nextcloud 34 and PHP 8.2–8.5
 - app identifier `wechselbild`
 - curated `Featured pictures of landscapes` from Wikimedia Commons
+- resource-saving 1920-pixel source thumbnails
 - four images on the first refresh, then one every six hours, at most eight
 - same-origin image delivery; visitors never contact an image provider
 - visible work title, author, license and Commons source attribution

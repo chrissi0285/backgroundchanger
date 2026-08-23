@@ -42,6 +42,7 @@ function validPage(): array {
 
 expect(MetadataPolicy::cleanText('<script>alert(1)</script> A&nbsp;B') === 'alert(1) A B', 'HTML must become plain text');
 expect(MetadataPolicy::extensionForMime('image/jpeg') === 'jpg', 'JPEG extension');
+expect(MetadataPolicy::REQUEST_WIDTH === 1920, 'Resource-saving Commons thumbnail width');
 expect(MetadataPolicy::extensionForMime('text/html') === null, 'HTML must be rejected');
 expect(MetadataPolicy::licenseUrl('CC BY-SA 4.0') === 'https://creativecommons.org/licenses/by-sa/4.0/', 'Known license URL');
 expect(MetadataPolicy::licenseUrl('All rights reserved') === null, 'Non-free license must be rejected');
