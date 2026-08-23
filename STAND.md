@@ -160,3 +160,28 @@ Der private 4096-Bit-Schlüssel liegt ausschließlich mit Modus 600 unter
 `/home/chrissi/llmo/secrets/wechselbild.key`. Solange Nextcloud den PR nicht
 freigegeben hat, wird bewusst kein Paket als signiert ausgegeben und nichts
 produktiv installiert.
+
+Am 24. August 2026 wurde der Abschlussstand erneut geprüft:
+
+- Commit `786a3ee` liegt unverändert auf dem öffentlichen Hauptzweig. Das aus
+  genau diesem Stand erzeugte Archiv
+  `build/wechselbild-1.0.0-unsigned.tar.gz` hat SHA-256
+  `34819cd9fd96edc6e0fb62a14838fdaa0fd9cca8c053118e3408691a7659a875`.
+  Es enthält 18 Dateien, keine Tests, Git-Daten, Signaturdatei oder privaten
+  Schlüssel. Im Nextcloud-34-Gast waren alle Paketdateien bytegleich mit dem
+  vollständig getesteten Laufzeitbaum; PHP-, JavaScript- und XML-Prüfung
+  bestanden auch direkt am entpackten Paket.
+- Zertifikats-PR 1181 ist offen. Die DCO-Prüfung ist erfolgreich, der PR ist
+  aber bis zur Nextcloud-Prüfung blockiert; es gibt noch keine Freigabe und
+  kein App-Zertifikat. Das ist der einzige verbleibende externe Blocker vor
+  Signierung, letzter RUNI-Integritätsprüfung des signierten Pakets und einer
+  möglichen produktiven Installation.
+- Der temporäre Gast 100, sein logischer Datenträger und das ausschließlich
+  für diesen Test geladene Ubuntu-26.04-Abbild wurden vollständig entfernt.
+  RUNI wurde danach geordnet heruntergefahren und war anschließend nicht mehr
+  per SSH erreichbar. CT2099 wurde zu keinem Zeitpunkt betreten oder
+  verändert.
+- Produktiv wurde abschließend erneut nur lesend geprüft: Nextcloud läuft als
+  34.0.3.2, Wartungsmodus und Datenbank-Upgradebedarf sind aus, Core- und
+  `unsplash`-Integrität sind sauber, `unsplash` bleibt deaktiviert auf 3.1.0
+  und `wechselbild` ist weder als App registriert noch als Ordner vorhanden.
