@@ -177,5 +177,4 @@
 	window.addEventListener('pageshow', () => void rotate())
 	window.addEventListener('popstate', () => void rotate())
 	window.addEventListener('hashchange', () => void rotate())
-	void rotate()
 })()

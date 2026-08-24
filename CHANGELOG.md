@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- Avoid a second background request when the initial `pageshow` event arrives
+  more than 300 milliseconds after the script was loaded.
+
 ## 1.0.0
 
 - Introduce the independent `wechselbild` app identifier and namespace.

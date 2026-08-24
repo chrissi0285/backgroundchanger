@@ -213,8 +213,8 @@ assert(exceptions.length === 0, `Browser exceptions: ${exceptions.join('; ')}`)
 
 const selectionRequests = requests.filter(url => url.includes('/apps/wechselbild/api/background'))
 const imageRequests = requests.filter(url => url.includes('/apps/wechselbild/api/image/'))
-assert(selectionRequests.length >= 3, 'Each tested page must request a local selection')
-assert(imageRequests.length >= 3, 'Each tested page must request a local image')
+assert(selectionRequests.length === 3, `Each tested page must request exactly one local selection, got ${selectionRequests.length}`)
+assert(imageRequests.length === 3, `Each tested page must request exactly one local image, got ${imageRequests.length}`)
 
 console.log(JSON.stringify({
 	login,

@@ -15,7 +15,7 @@ Zeigt bei jedem Seitenaufruf eine andere kuratierte Landschaft. Bilder werden
 sparsam abgerufen, geprüft, lokal gespeichert und mit Urheber, Lizenz und
 Quelle ausgewiesen. Die letzten gültigen Bilder bleiben offline verfügbar.
     ]]></description>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <licence>agpl</licence>
     <author homepage="https://github.com/chrissi0285">Christian</author>
     <namespace>Wechselbild</namespace>
