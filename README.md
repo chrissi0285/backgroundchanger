@@ -1,43 +1,50 @@
-# Wechselbild
+# Background Changer
 
-Wechselbild shows a different curated landscape background on each Nextcloud
-page load. Images are fetched sparingly from Wikimedia Commons, validated and
-served from a small local cache. Once at least one image was fetched, an
-internet outage does not remove the background or impair the Nextcloud UI.
+Background Changer shows rotating Wikimedia Commons backgrounds on Nextcloud
+34. It rotates on page loads, in-page navigation and every five minutes while
+the page is visible. Images are validated and served from small local caches;
+the browser never contacts an image provider. Cached images remain available
+when the server is temporarily offline.
 
-## Design
+## Themes
 
+Signed-in users can choose **Default**, **Off**, **Landscapes**, **Animals**,
+**Space** or **Architecture** in Nextcloud's personal appearance settings.
+Default and the anonymous login page use Landscapes. A personal background
+chosen with Nextcloud's own theming controls always takes precedence.
+
+Each curated theme has a separate cache with three to six images. The first
+refresh fills missing offline fallbacks. Later six-hour refreshes rotate through
+one theme at a time to limit provider traffic, storage and CPU use.
+
+## Security and privacy
+
+- App identifier `backgroundchanger` and namespace `OCA\BackgroundChanger`
 - Nextcloud 34 and PHP 8.2–8.5
-- app identifier `wechselbild`
-- curated `Featured pictures of landscapes` from Wikimedia Commons
-- resource-saving 1920-pixel source thumbnails
-- four images on the first refresh, then one every six hours, at most eight
-- same-origin image delivery; visitors never contact an image provider
+- fixed 1920-pixel Wikimedia Commons thumbnails
+- strict image host, MIME type, dimensions, response size and free-license
+  allow-lists
+- same-origin image delivery and no provider requests from visitors' browsers
 - visible work title, author, license and Commons source attribution
-- users with an explicitly selected personal Nextcloud background are left
-  untouched
-- safe CSS gradient before the first successful refresh
+- local fallback before the first successful refresh and during outages
 
-Run a refresh as the web-server user:
+Refresh the bounded caches as the web-server user:
 
 ```console
-php occ wechselbild:refresh
+php occ backgroundchanger:refresh
 ```
 
-## Provenance and license
+## Design, provenance and license
+
+The application symbol is derived from the central `chrissi0285` design source
+and the interface carries the exact line `designed by chrissi0285`. Public
+author and copyright metadata use `chrissi0285` exclusively.
 
 This AGPL-3.0-or-later project is a cleanly renamed successor to
-[`nextcloud/unsplash`](https://github.com/nextcloud/unsplash). Its Git history
-retains the original authorship. The new cache and Wikimedia integration were
-written for the independent identifier `wechselbild`; no upstream signing
-material is included or reused.
+[`nextcloud/unsplash`](https://github.com/nextcloud/unsplash). Git history keeps
+the upstream authorship. Background Changer uses its own identifier and will
+only be distributed with a certificate issued specifically for
+`backgroundchanger`; no upstream or predecessor signing material is reused.
 
-Each cached image keeps its own Wikimedia Commons author, source and free
-license metadata. The app accepts only an explicit allow-list of Commons
-licenses and does not alter the downloaded image.
-
-Only the server-side background job connects to Wikimedia Commons. Browser
-requests remain on the Nextcloud origin, so visitors do not disclose their IP
-address or navigation to the image provider.
-
-See [LICENSE.md](LICENSE.md) for the application license.
+Every cached image keeps its Wikimedia Commons author, source and free-license
+metadata. See [LICENSE.md](LICENSE.md) for the application license.

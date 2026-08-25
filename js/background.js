@@ -1,23 +1,27 @@
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 (() => {
 	'use strict'
 
-	const meta = document.querySelector('meta[name="wechselbild-endpoint"]')
+	const meta = document.querySelector('meta[name="backgroundchanger-endpoint"]')
 	if (!meta) {
 		return
 	}
 
 	const endpoint = sameOriginUrl(meta.content)
-	if (!endpoint) {
+	const themes = new Set(['landscapes', 'animals', 'space', 'architecture'])
+	let activeTheme = meta.dataset.theme || ''
+	if (!endpoint || !themes.has(activeTheme)) {
 		return
 	}
 
-	let lastRotation = 0
+	const ROTATION_INTERVAL_MS = 5 * 60 * 1000
 	let activeRequest = null
+	let rotationTimer = null
+	let pageShown = false
 
 	function sameOriginUrl(value) {
 		try {
@@ -37,19 +41,45 @@
 		}
 	}
 
-	function previousId() {
+	function previousId(theme) {
 		try {
-			return window.sessionStorage.getItem('wechselbild-last') || ''
+			return window.sessionStorage.getItem(`backgroundchanger-last-${theme}`) || ''
 		} catch (error) {
 			return ''
 		}
 	}
 
-	function rememberId(id) {
+	function rememberId(theme, id) {
 		try {
-			window.sessionStorage.setItem('wechselbild-last', id)
+			window.sessionStorage.setItem(`backgroundchanger-last-${theme}`, id)
 		} catch (error) {
 			// A blocked session store must never block the background itself.
+		}
+	}
+
+	async function decodeImage(url, signal) {
+		if (signal.aborted) {
+			throw new DOMException('Aborted', 'AbortError')
+		}
+		const image = new Image()
+		image.decoding = 'async'
+		image.src = url.href
+
+		let abort
+		const aborted = new Promise((unused, reject) => {
+			abort = () => reject(new DOMException('Aborted', 'AbortError'))
+			signal.addEventListener('abort', abort, { once: true })
+		})
+		try {
+			await Promise.race([image.decode(), aborted])
+			if (signal.aborted) {
+				throw new DOMException('Aborted', 'AbortError')
+			}
+			if (image.naturalWidth === 0 || image.naturalHeight === 0) {
+				throw new Error('Decoded background has no dimensions')
+			}
+		} finally {
+			signal.removeEventListener('abort', abort)
 		}
 	}
 
@@ -69,16 +99,18 @@
 			return false
 		}
 
-		let credit = document.getElementById('wechselbild-credit')
+		let credit = document.getElementById('backgroundchanger-credit')
 		if (!credit) {
 			credit = document.createElement('aside')
-			credit.id = 'wechselbild-credit'
-			credit.setAttribute('aria-label', 'Bildnachweis')
+			credit.id = 'backgroundchanger-credit'
+			credit.setAttribute('aria-label', 'Image attribution')
 			document.body.appendChild(credit)
 		}
 
-		credit.replaceChildren(
-			document.createTextNode('Bild: '),
+		const attribution = document.createElement('span')
+		attribution.className = 'backgroundchanger-attribution'
+		attribution.append(
+			document.createTextNode('Image: '),
 			link(background.title, source),
 			document.createTextNode(' · '),
 			link(background.author, source),
@@ -87,6 +119,10 @@
 			document.createTextNode(' · '),
 			link('Wikimedia Commons', source),
 		)
+		const design = document.createElement('span')
+		design.className = 'backgroundchanger-design'
+		design.textContent = 'designed by chrissi0285'
+		credit.replaceChildren(attribution, design)
 		if (background.description) {
 			credit.title = background.description
 		} else {
@@ -95,12 +131,16 @@
 		return true
 	}
 
+	function clearBackground() {
+		document.documentElement.style.removeProperty('--backgroundchanger-image')
+		document.documentElement.removeAttribute('data-backgroundchanger-ready')
+		document.documentElement.removeAttribute('data-backgroundchanger-theme')
+		document.documentElement.setAttribute('data-backgroundchanger-disabled', '')
+		document.getElementById('backgroundchanger-credit')?.remove()
+	}
+
 	async function rotate() {
-		const now = Date.now()
-		if (now - lastRotation < 300) {
-			return
-		}
-		lastRotation = now
+		document.documentElement.removeAttribute('data-backgroundchanger-ready')
 
 		if (activeRequest) {
 			activeRequest.abort()
@@ -111,7 +151,7 @@
 
 		try {
 			const url = new URL(endpoint.href)
-			const exclude = previousId()
+			const exclude = previousId(activeTheme)
 			if (/^[a-f0-9]{32}$/.test(exclude)) {
 				url.searchParams.set('exclude', exclude)
 			}
@@ -128,12 +168,16 @@
 
 			const payload = await response.json()
 			const background = payload.background
-			if (!background || !/^[a-f0-9]{32}$/.test(background.id)) {
+			if (background === null) {
+				clearBackground()
+				return
+			}
+			if (!background || !themes.has(background.theme) || !/^[a-f0-9]{32}$/.test(background.id)) {
 				return
 			}
 
 			const image = sameOriginUrl(background.image)
-			if (!image || !image.pathname.includes('/apps/wechselbild/api/image/')) {
+			if (!image || !image.pathname.includes(`/apps/backgroundchanger/api/image/${background.theme}/`)) {
 				return
 			}
 			if (typeof background.title !== 'string' || background.title.length === 0
@@ -143,15 +187,20 @@
 				|| typeof background.licenseUrl !== 'string') {
 				return
 			}
+			await decodeImage(image, controller.signal)
 			if (!renderCredit(background)) {
 				return
 			}
 
-			document.documentElement.style.setProperty('--wechselbild-image', `url("${image.href}")`)
-			rememberId(background.id)
+			document.documentElement.removeAttribute('data-backgroundchanger-disabled')
+			document.documentElement.style.setProperty('--backgroundchanger-image', `url("${image.href}")`)
+			activeTheme = background.theme
+			rememberId(activeTheme, background.id)
+			document.documentElement.dataset.backgroundchangerTheme = activeTheme
+			document.documentElement.dataset.backgroundchangerReady = background.id
 		} catch (error) {
-			if (error?.name !== 'AbortError') {
-				console.debug('Wechselbild: lokaler Hintergrund nicht verfügbar')
+			if (error?.name !== 'AbortError' && !controller.signal.aborted) {
+				console.debug('Background Changer: local background unavailable')
 			}
 		} finally {
 			window.clearTimeout(timeout)
@@ -161,20 +210,42 @@
 		}
 	}
 
-	function rotateForNavigation(event) {
-		const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null
-		if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) {
-			return
+	function scheduleRotation() {
+		if (rotationTimer !== null) {
+			window.clearTimeout(rotationTimer)
 		}
-		const target = sameOriginUrl(anchor.href)
-		if (!target || target.href === window.location.href) {
-			return
-		}
-		window.setTimeout(() => void rotate(), 0)
+		rotationTimer = window.setTimeout(() => {
+			rotationTimer = null
+			void rotate()
+		}, 0)
 	}
 
-	document.addEventListener('click', rotateForNavigation, true)
-	window.addEventListener('pageshow', () => void rotate())
-	window.addEventListener('popstate', () => void rotate())
-	window.addEventListener('hashchange', () => void rotate())
+	for (const method of ['pushState', 'replaceState']) {
+		const original = window.history[method]
+		window.history[method] = function (...args) {
+			const previous = window.location.href
+			const result = Reflect.apply(original, this, args)
+			if (pageShown && window.location.href !== previous) {
+				scheduleRotation()
+			}
+			return result
+		}
+	}
+
+	window.addEventListener('pageshow', () => {
+		pageShown = true
+		scheduleRotation()
+	})
+	window.addEventListener('popstate', scheduleRotation)
+	window.addEventListener('hashchange', scheduleRotation)
+	document.addEventListener('visibilitychange', () => {
+		if (document.visibilityState === 'visible') {
+			scheduleRotation()
+		}
+	})
+	window.setInterval(() => {
+		if (document.visibilityState === 'visible') {
+			scheduleRotation()
+		}
+	}, ROTATION_INTERVAL_MS)
 })()

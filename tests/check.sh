@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# SPDX-FileCopyrightText: 2026 Christian
+# SPDX-FileCopyrightText: 2026 chrissi0285
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 set -euo pipefail
@@ -20,10 +20,21 @@ node --check tests/browser-test.mjs
 bash -n tests/runi-install.sh
 xmllint --noout appinfo/info.xml
 
-if grep -R -n -E 'OCA\\Unsplash|<id>unsplash</id>|apps/unsplash' appinfo css img js lib; then
-	printf '%s\n' 'Runtime files still contain the foreign app identity.' >&2
+if grep -R -n -E 'OCA\\(Unsplash|Wechselbild)|<id>(unsplash|wechselbild)</id>|apps/(unsplash|wechselbild)' appinfo css img js lib; then
+	printf '%s\n' 'Runtime files still contain a foreign or predecessor app identity.' >&2
 	exit 1
 fi
+
+if grep -R -n -E 'SPDX-FileCopyrightText: 2026 (Christian|Chrissi)|<author[^>]*>(Christian|Chrissi)<' appinfo css img js lib tests; then
+	printf '%s\n' 'Public author metadata is inconsistent.' >&2
+	exit 1
+fi
+
+grep -q '<id>backgroundchanger</id>' appinfo/info.xml
+grep -q '<namespace>BackgroundChanger</namespace>' appinfo/info.xml
+grep -q '<author homepage="https://github.com/chrissi0285">chrissi0285</author>' appinfo/info.xml
+grep -q 'Source-SHA256: 867c66e8d84bc2ee279fa2a85a6a4659160db9091c6a18ae01566aa7de2a3e99' img/app.svg
+grep -q 'designed by chrissi0285' js/background.js
 
 if find . -path './.git' -prune -o -name 'signature.json' -print | grep -q .; then
 	printf '%s\n' 'An unsigned development tree must not carry a foreign signature.' >&2

@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-namespace OCA\Wechselbild\Command;
+namespace OCA\BackgroundChanger\Command;
 
-use OCA\Wechselbild\Service\RefreshService;
+use OCA\BackgroundChanger\Service\RefreshService;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -22,7 +22,7 @@ final class Refresh extends Command {
 	#[\Override]
 	protected function configure(): void {
 		$this
-			->setName('wechselbild:refresh')
+			->setName('backgroundchanger:refresh')
 			->setDescription('Fetch and validate the next Wikimedia Commons backgrounds');
 	}
 
@@ -31,12 +31,12 @@ final class Refresh extends Command {
 		try {
 			$result = $this->refreshService->refresh();
 		} catch (\Throwable $e) {
-			$output->writeln('<error>Wechselbild refresh failed: ' . $e->getMessage() . '</error>');
+			$output->writeln('<error>Background Changer refresh failed: ' . $e->getMessage() . '</error>');
 			return Command::FAILURE;
 		}
 
 		$output->writeln(sprintf(
-			'Wechselbild cache: %d before, %d added, %d rejected, %d after.',
+			'Background Changer cache: %d before, %d added, %d rejected, %d after.',
 			$result['before'],
 			$result['added'],
 			$result['rejected'],

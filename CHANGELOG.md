@@ -1,16 +1,22 @@
 # Changelog
 
-## 1.0.1
+## Background Changer 1.0.0 (unreleased)
 
-- Avoid a second background request when the initial `pageshow` event arrives
-  more than 300 milliseconds after the script was loaded.
+- Introduce the independent `backgroundchanger` identifier and
+  `OCA\BackgroundChanger` namespace.
+- Add persistent personal choices for Default, Off, Landscapes, Animals, Space
+  and Architecture in Nextcloud's appearance settings.
+- Keep separate bounded local caches and Commons category allow-lists per
+  visual theme.
+- Retain safe page-load, SPA-navigation and five-minute rotation with local
+  image delivery and complete attribution.
+- Derive the app icon from the central `chrissi0285` symbol and display
+  `designed by chrissi0285`.
+- Use `chrissi0285` exclusively in public author and copyright metadata.
 
-## 1.0.0
+## Wechselbild predecessor history
 
-- Introduce the independent `wechselbild` app identifier and namespace.
-- Fetch curated landscape images through Nextcloud's protected HTTP client.
-- Request fixed 1920-pixel Commons thumbnails to avoid oversized derivatives.
-- Validate source hosts, licenses, metadata, response size and image content.
-- Rotate a bounded local cache with a persistent offline fallback.
-- Serve immutable same-origin images and show source attribution.
-- Respect explicitly configured personal Nextcloud backgrounds.
+- 1.0.3 added stable SPA and timed rotation.
+- 1.0.2 decoded images before atomically switching image and attribution.
+- 1.0.1 removed a duplicate initial background selection.
+- 1.0.0 introduced the first independent Wikimedia Commons cache.

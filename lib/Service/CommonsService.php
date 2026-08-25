@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-namespace OCA\Wechselbild\Service;
+namespace OCA\BackgroundChanger\Service;
 
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\Http\Client\IClient;
@@ -16,8 +16,7 @@ use OCP\Http\Client\IResponse;
 
 final class CommonsService {
 	private const API_URL = 'https://commons.wikimedia.org/w/api.php';
-	private const CATEGORY = 'Category:Featured pictures of landscapes';
-	private const USER_AGENT = 'Wechselbild/1.0 (+https://github.com/chrissi0285/wechselbild)';
+	private const USER_AGENT = 'BackgroundChanger/1.0 (+https://github.com/chrissi0285/backgroundchanger)';
 	private const MAX_API_BYTES = 1_000_000;
 	private const MAX_IMAGE_BYTES = 12_000_000;
 	private const MIN_IMAGE_BYTES = 32_000;
@@ -32,29 +31,36 @@ final class CommonsService {
 	}
 
 	/** @return list<array<string, int|string>> */
-	public function discover(int $limit = 24): array {
+	public function discover(string $theme, int $limit = 24): array {
+		$categories = ThemeService::categoriesFor($theme);
+		if ($categories === []) {
+			throw new \InvalidArgumentException('Invalid background theme');
+		}
+		$category = $categories[random_int(0, count($categories) - 1)];
 		$limit = max(1, min(50, $limit));
-		$prefix = chr(random_int(ord('A'), ord('Z')));
+		$query = [
+			'action' => 'query',
+			'format' => 'json',
+			'formatversion' => 2,
+			'generator' => 'categorymembers',
+			'gcmtitle' => $category,
+			'gcmnamespace' => 6,
+			'gcmtype' => 'file',
+			'gcmlimit' => $limit,
+			'prop' => 'imageinfo',
+			'iiprop' => 'url|mime|size|extmetadata',
+			'iiurlwidth' => MetadataPolicy::REQUEST_WIDTH,
+			'iiextmetadatalanguage' => 'en',
+			'iiextmetadatafilter' => 'Artist|ImageDescription|LicenseShortName|Restrictions',
+			'maxlag' => 5,
+			'maxage' => 3600,
+			'smaxage' => 3600,
+		];
+		if ($theme === ThemeService::LANDSCAPES) {
+			$query['gcmstartsortkeyprefix'] = chr(random_int(ord('A'), ord('Z')));
+		}
 		$response = $this->client->get(self::API_URL, [
-			'query' => [
-				'action' => 'query',
-				'format' => 'json',
-				'formatversion' => 2,
-				'generator' => 'categorymembers',
-				'gcmtitle' => self::CATEGORY,
-				'gcmnamespace' => 6,
-				'gcmtype' => 'file',
-				'gcmlimit' => $limit,
-				'gcmstartsortkeyprefix' => $prefix,
-				'prop' => 'imageinfo',
-				'iiprop' => 'url|mime|size|extmetadata',
-				'iiurlwidth' => MetadataPolicy::REQUEST_WIDTH,
-				'iiextmetadatalanguage' => 'en',
-				'iiextmetadatafilter' => 'Artist|ImageDescription|LicenseShortName|Restrictions',
-				'maxlag' => 5,
-				'maxage' => 3600,
-				'smaxage' => 3600,
-			],
+			'query' => $query,
 			'headers' => $this->headers('application/json'),
 			'timeout' => 20,
 			'allow_redirects' => false,

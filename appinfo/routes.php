@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
@@ -16,9 +16,12 @@ return [
 		],
 		[
 			'name' => 'background#image',
-			'url' => '/api/image/{id}',
+			'url' => '/api/image/{theme}/{id}',
 			'verb' => 'GET',
-			'requirements' => ['id' => '[a-f0-9]{32}'],
+			'requirements' => [
+				'theme' => 'landscapes|animals|space|architecture',
+				'id' => '[a-f0-9]{32}',
+			],
 		],
 	],
 ];

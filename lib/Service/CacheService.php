@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-namespace OCA\Wechselbild\Service;
+namespace OCA\BackgroundChanger\Service;
 
 use OCP\Files\IAppData;
 use OCP\Files\NotFoundException;
@@ -22,8 +22,8 @@ final class CacheService {
 	}
 
 	/** @return list<array<string, int|string>> */
-	public function listBackgrounds(): array {
-		$folder = $this->folder(false);
+	public function listBackgrounds(string $theme): array {
+		$folder = $this->folder($theme, false);
 		if ($folder === null) {
 			return [];
 		}
@@ -33,7 +33,7 @@ final class CacheService {
 			if (!str_ends_with($file->getName(), '.json') || $file->getSize() > 32_000) {
 				continue;
 			}
-			$record = $this->readRecord($folder, $file);
+			$record = $this->readRecord($theme, $folder, $file);
 			if ($record !== null) {
 				$backgrounds[] = $record;
 			}
@@ -46,12 +46,20 @@ final class CacheService {
 		return $backgrounds;
 	}
 
-	public function count(): int {
-		return count($this->listBackgrounds());
+	public function count(string $theme): int {
+		return count($this->listBackgrounds($theme));
 	}
 
-	public function hasSource(string $sourceUrl): bool {
-		foreach ($this->listBackgrounds() as $background) {
+	public function totalCount(): int {
+		$total = 0;
+		foreach (ThemeService::cacheThemes() as $theme) {
+			$total += $this->count($theme);
+		}
+		return $total;
+	}
+
+	public function hasSource(string $theme, string $sourceUrl): bool {
+		foreach ($this->listBackgrounds($theme) as $background) {
 			if (hash_equals((string)$background['sourceUrl'], $sourceUrl)) {
 				return true;
 			}
@@ -60,8 +68,8 @@ final class CacheService {
 	}
 
 	/** @return array<string, int|string>|null */
-	public function select(string $exclude = ''): ?array {
-		$backgrounds = $this->listBackgrounds();
+	public function select(string $theme, string $exclude = ''): ?array {
+		$backgrounds = $this->listBackgrounds($theme);
 		if (count($backgrounds) > 1 && preg_match('/^[a-f0-9]{32}$/D', $exclude) === 1) {
 			$backgrounds = array_values(array_filter(
 				$backgrounds,
@@ -77,7 +85,10 @@ final class CacheService {
 	/**
 	 * @param array<string, int|string> $download
 	 */
-	public function store(array $download): bool {
+	public function store(string $theme, array $download): bool {
+		if (!ThemeService::isCacheTheme($theme)) {
+			throw new \InvalidArgumentException('Invalid background theme');
+		}
 		$body = $download['body'] ?? null;
 		$mime = is_string($download['mime'] ?? null) ? $download['mime'] : '';
 		$extension = MetadataPolicy::extensionForMime($mime);
@@ -89,12 +100,16 @@ final class CacheService {
 		$id = substr($hash, 0, 32);
 		$imageName = $id . '.' . $extension;
 		$metadataName = $id . '.json';
-		$folder = $this->folder(true);
+		$folder = $this->folder($theme, true);
+		if ($folder === null) {
+			throw new \RuntimeException('Unable to create theme cache');
+		}
 		if ($folder->fileExists($metadataName)) {
 			return false;
 		}
 
 		$record = [
+			'theme' => $theme,
 			'id' => $id,
 			'file' => $imageName,
 			'sha256' => $hash,
@@ -109,7 +124,7 @@ final class CacheService {
 			'licenseUrl' => (string)($download['licenseUrl'] ?? ''),
 			'sourceUrl' => (string)($download['sourceUrl'] ?? ''),
 		];
-		if (!$this->validRecord($record, $metadataName)) {
+		if (!$this->validRecord($theme, $record, $metadataName)) {
 			throw new \InvalidArgumentException('Invalid image metadata');
 		}
 
@@ -129,14 +144,14 @@ final class CacheService {
 		return true;
 	}
 
-	public function prune(int $maximum): void {
+	public function prune(string $theme, int $maximum): void {
 		$maximum = max(1, $maximum);
-		$folder = $this->folder(false);
+		$folder = $this->folder($theme, false);
 		if ($folder === null) {
 			return;
 		}
 
-		$backgrounds = $this->listBackgrounds();
+		$backgrounds = $this->listBackgrounds($theme);
 		foreach (array_slice($backgrounds, $maximum) as $background) {
 			$metadataName = (string)$background['id'] . '.json';
 			if ($folder->fileExists($metadataName)) {
@@ -145,13 +160,13 @@ final class CacheService {
 		}
 	}
 
-	public function cleanupOrphanImages(int $olderThan): void {
-		$folder = $this->folder(false);
+	public function cleanupOrphanImages(string $theme, int $olderThan): void {
+		$folder = $this->folder($theme, false);
 		if ($folder === null) {
 			return;
 		}
 		$active = [];
-		foreach ($this->listBackgrounds() as $background) {
+		foreach ($this->listBackgrounds($theme) as $background) {
 			$active[(string)$background['file']] = true;
 		}
 
@@ -167,11 +182,14 @@ final class CacheService {
 	}
 
 	/** @return array{0: ISimpleFile, 1: string}|null */
-	public function image(string $id): ?array {
+	public function image(string $theme, string $id): ?array {
+		if (!ThemeService::isCacheTheme($theme)) {
+			return null;
+		}
 		if (preg_match('/^[a-f0-9]{32}$/D', $id) !== 1) {
 			return null;
 		}
-		$folder = $this->folder(false);
+		$folder = $this->folder($theme, false);
 		if ($folder === null) {
 			return null;
 		}
@@ -194,9 +212,21 @@ final class CacheService {
 		return null;
 	}
 
-	private function folder(bool $create): ?ISimpleFolder {
+	private function folder(string $theme, bool $create): ?ISimpleFolder {
+		if (!ThemeService::isCacheTheme($theme)) {
+			return null;
+		}
+
+		$root = $this->childFolder($this->appData, self::FOLDER, $create);
+		if ($root === null) {
+			return null;
+		}
+		return $this->childFolder($root, $theme, $create);
+	}
+
+	private function childFolder(IAppData|ISimpleFolder $parent, string $name, bool $create): ?ISimpleFolder {
 		try {
-			return $this->appData->getFolder(self::FOLDER);
+			return $parent->getFolder($name);
 		} catch (NotFoundException $e) {
 			if (!$create) {
 				return null;
@@ -204,9 +234,9 @@ final class CacheService {
 		}
 
 		try {
-			return $this->appData->newFolder(self::FOLDER);
+			return $parent->newFolder($name);
 		} catch (\Throwable $e) {
-			return $this->appData->getFolder(self::FOLDER);
+			return $parent->getFolder($name);
 		}
 	}
 
@@ -219,10 +249,10 @@ final class CacheService {
 	}
 
 	/** @return array<string, int|string>|null */
-	private function readRecord(ISimpleFolder $folder, ISimpleFile $file): ?array {
+	private function readRecord(string $theme, ISimpleFolder $folder, ISimpleFile $file): ?array {
 		try {
 			$record = json_decode($file->getContent(), true, 16, JSON_THROW_ON_ERROR);
-			if (!is_array($record) || !$this->validRecord($record, $file->getName())) {
+			if (!is_array($record) || !$this->validRecord($theme, $record, $file->getName())) {
 				return null;
 			}
 			if (!$folder->fileExists((string)$record['file'])) {
@@ -238,9 +268,9 @@ final class CacheService {
 		return $record;
 	}
 
-	private function validRecord(array $record, string $metadataName): bool {
+	private function validRecord(string $theme, array $record, string $metadataName): bool {
 		$stringKeys = [
-			'id', 'file', 'sha256', 'mime', 'title', 'description', 'author',
+			'theme', 'id', 'file', 'sha256', 'mime', 'title', 'description', 'author',
 			'license', 'licenseUrl', 'sourceUrl',
 		];
 		foreach ($stringKeys as $key) {
@@ -264,7 +294,9 @@ final class CacheService {
 		$author = is_string($record['author'] ?? null) ? $record['author'] : '';
 		$hash = is_string($record['sha256'] ?? null) ? $record['sha256'] : '';
 
-		return preg_match('/^[a-f0-9]{32}$/D', $id) === 1
+		return ThemeService::isCacheTheme($theme)
+			&& ($record['theme'] ?? null) === $theme
+			&& preg_match('/^[a-f0-9]{32}$/D', $id) === 1
 			&& $metadataName === $id . '.json'
 			&& $extension !== null
 			&& $file === $id . '.' . $extension

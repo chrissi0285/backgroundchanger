@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 
-# SPDX-FileCopyrightText: 2026 Christian
+# SPDX-FileCopyrightText: 2026 chrissi0285
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 set -euo pipefail
 
 guest_ip=${1:-}
-release_root=/root/wechselbild-test
+release_root=/root/backgroundchanger-test
 archive=$release_root/nextcloud-34.0.3.tar.bz2
-db_password=${WECHSELBILD_DB_PASSWORD:-}
-admin_password=${WECHSELBILD_ADMIN_PASSWORD:-}
+db_password=${BACKGROUNDCHANGER_DB_PASSWORD:-}
+admin_password=${BACKGROUNDCHANGER_ADMIN_PASSWORD:-}
 
 if [[ ! $guest_ip =~ ^172\.16\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
 	printf '%s\n' 'Expected the isolated RUNI guest IPv4 address.' >&2
@@ -17,7 +17,7 @@ if [[ ! $guest_ip =~ ^172\.16\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
 fi
 if [[ ! $db_password =~ ^[A-Za-z0-9_-]{20,128}$
 	|| ! $admin_password =~ ^[A-Za-z0-9_-]{20,128}$ ]]; then
-	printf '%s\n' 'Provide random test passwords through WECHSELBILD_DB_PASSWORD and WECHSELBILD_ADMIN_PASSWORD.' >&2
+	printf '%s\n' 'Provide random test passwords through BACKGROUNDCHANGER_DB_PASSWORD and BACKGROUNDCHANGER_ADMIN_PASSWORD.' >&2
 	exit 2
 fi
 if [[ -e /var/www/nextcloud || ! -f $archive ]]; then

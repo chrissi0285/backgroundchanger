@@ -3,13 +3,15 @@
 declare(strict_types=1);
 
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 require_once __DIR__ . '/../lib/Service/MetadataPolicy.php';
+require_once __DIR__ . '/../lib/Service/ThemeService.php';
 
-use OCA\Wechselbild\Service\MetadataPolicy;
+use OCA\BackgroundChanger\Service\MetadataPolicy;
+use OCA\BackgroundChanger\Service\ThemeService;
 
 $tests = 0;
 
@@ -95,10 +97,37 @@ expect(MetadataPolicy::candidateFromPage($wrongMime) === null, 'SVG must not ent
 $info = new DOMDocument();
 expect($info->load(__DIR__ . '/../appinfo/info.xml'), 'info.xml must parse');
 $xpath = new DOMXPath($info);
-expect($xpath->evaluate('string(/info/id)') === 'wechselbild', 'Independent app identifier');
-expect($xpath->evaluate('string(/info/namespace)') === 'Wechselbild', 'Independent namespace');
+expect($xpath->evaluate('string(/info/id)') === 'backgroundchanger', 'Independent app identifier');
+expect($xpath->evaluate('string(/info/name)') === 'Background Changer', 'International app name');
+expect($xpath->evaluate('string(/info/namespace)') === 'BackgroundChanger', 'Independent namespace');
+expect($xpath->evaluate('string(/info/author)') === 'chrissi0285', 'Public author identity');
+expect($xpath->evaluate('string(/info/version)') === '1.0.0', 'New app starts with a new release line');
+expect($xpath->evaluate('string(/info/repository)') === 'https://github.com/chrissi0285/backgroundchanger.git', 'Repository identity');
 expect($xpath->evaluate('string(/info/dependencies/nextcloud/@min-version)') === '34', 'Nextcloud minimum');
 expect($xpath->evaluate('string(/info/dependencies/nextcloud/@max-version)') === '34', 'Nextcloud maximum');
 expect(!file_exists(__DIR__ . '/../appinfo/signature.json'), 'No foreign signature may be bundled');
+
+expect(ThemeService::cacheThemes() === ['landscapes', 'animals', 'space', 'architecture'], 'Curated cache themes');
+expect(ThemeService::normalizePreference('default') === 'default', 'Default preference');
+expect(ThemeService::normalizePreference('off') === 'off', 'Off preference');
+expect(ThemeService::normalizePreference('animals') === 'animals', 'Animal preference');
+expect(ThemeService::normalizePreference('invalid') === 'default', 'Invalid preference fails safely');
+expect(ThemeService::effectiveTheme('default') === 'landscapes', 'Default resolves to anonymous-safe landscapes');
+expect(ThemeService::effectiveTheme('off') === null, 'Off suppresses backgrounds');
+expect(ThemeService::isCacheTheme('space'), 'Space is a cache theme');
+expect(!ThemeService::isCacheTheme('../space'), 'Cache theme rejects paths');
+
+$categories = ThemeService::commonsCategories();
+foreach (ThemeService::cacheThemes() as $theme) {
+	expect(isset($categories[$theme]) && $categories[$theme] !== [], 'Commons categories exist for ' . $theme);
+	foreach ($categories[$theme] as $category) {
+		expect(str_starts_with($category, 'Category:Featured pictures of '), 'Curated Commons category for ' . $theme);
+	}
+}
+
+$svg = file_get_contents(__DIR__ . '/../img/app.svg');
+expect(is_string($svg) && str_contains($svg, '867c66e8d84bc2ee279fa2a85a6a4659160db9091c6a18ae01566aa7de2a3e99'), 'Central symbol provenance');
+$script = file_get_contents(__DIR__ . '/../js/background.js');
+expect(is_string($script) && str_contains($script, 'designed by chrissi0285'), 'Exact visible design line');
 
 fwrite(STDOUT, sprintf("%d unit checks passed.\n", $tests));

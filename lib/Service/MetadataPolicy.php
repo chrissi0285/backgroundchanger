@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-namespace OCA\Wechselbild\Service;
+namespace OCA\BackgroundChanger\Service;
 
 final class MetadataPolicy {
 	public const MAX_TEXT_LENGTH = 300;

@@ -3,14 +3,15 @@
 declare(strict_types=1);
 
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-namespace OCA\Wechselbild\Controller;
+namespace OCA\BackgroundChanger\Controller;
 
-use OCA\Wechselbild\AppInfo\Application;
-use OCA\Wechselbild\Service\CacheService;
+use OCA\BackgroundChanger\AppInfo\Application;
+use OCA\BackgroundChanger\Service\CacheService;
+use OCA\BackgroundChanger\Service\ThemeService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -27,6 +28,7 @@ final class BackgroundController extends Controller {
 	public function __construct(
 		IRequest $request,
 		private CacheService $cache,
+		private ThemeService $themes,
 		private IURLGenerator $urlGenerator,
 	) {
 		parent::__construct(Application::APP_ID, $request);
@@ -36,8 +38,14 @@ final class BackgroundController extends Controller {
 	#[NoCSRFRequired]
 	#[NoTwoFactorRequired]
 	public function select(mixed $exclude = ''): JSONResponse {
+		$theme = $this->themes->currentTheme();
+		if ($theme === null) {
+			$response = new JSONResponse(['background' => null]);
+			$response->cacheFor(0);
+			return $response;
+		}
 		$excludedId = is_string($exclude) ? $exclude : '';
-		$background = $this->cache->select($excludedId);
+		$background = $this->cache->select($theme, $excludedId);
 		if ($background === null) {
 			$response = new JSONResponse(['background' => null]);
 			$response->cacheFor(0);
@@ -47,9 +55,10 @@ final class BackgroundController extends Controller {
 		$response = new JSONResponse([
 			'background' => [
 				'id' => $background['id'],
+				'theme' => $theme,
 				'image' => $this->urlGenerator->linkToRouteAbsolute(
 					Application::APP_ID . '.background.image',
-					['id' => $background['id']],
+					['theme' => $theme, 'id' => $background['id']],
 				),
 				'title' => $background['title'],
 				'author' => $background['author'],
@@ -67,8 +76,8 @@ final class BackgroundController extends Controller {
 	#[PublicPage]
 	#[NoCSRFRequired]
 	#[NoTwoFactorRequired]
-	public function image(string $id): Response {
-		$image = $this->cache->image($id);
+	public function image(string $theme, string $id): Response {
+		$image = $this->cache->image($theme, $id);
 		if ($image === null) {
 			$response = new DataDisplayResponse('', Http::STATUS_NOT_FOUND, [
 				'Content-Type' => 'text/plain; charset=utf-8',

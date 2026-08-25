@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-use OCA\Wechselbild\Service\CacheService;
+use OCA\BackgroundChanger\Service\CacheService;
+use OCA\BackgroundChanger\Service\ThemeService;
 use OCP\Files\IAppData;
 use OCP\Files\NotFoundException;
 use OCP\Files\SimpleFS\ISimpleFile;
@@ -17,11 +18,14 @@ if (!interface_exists(IAppData::class)) {
 	throw new RuntimeException('Load the Nextcloud bootstrap before this test');
 }
 
-if (!class_exists(\OCA\Wechselbild\Service\MetadataPolicy::class, false)) {
+if (!class_exists(\OCA\BackgroundChanger\Service\MetadataPolicy::class, false)) {
 	require_once __DIR__ . '/../lib/Service/MetadataPolicy.php';
 }
 if (!class_exists(CacheService::class, false)) {
 	require_once __DIR__ . '/../lib/Service/CacheService.php';
+}
+if (!class_exists(ThemeService::class, false)) {
+	require_once __DIR__ . '/../lib/Service/ThemeService.php';
 }
 
 final class MemoryFile implements ISimpleFile {
@@ -90,6 +94,8 @@ final class MemoryFile implements ISimpleFile {
 final class MemoryFolder implements ISimpleFolder {
 	/** @var array<string, MemoryFile> */
 	private array $files = [];
+	/** @var array<string, MemoryFolder> */
+	private array $folders = [];
 
 	public function __construct(private string $name) {
 	}
@@ -114,6 +120,7 @@ final class MemoryFolder implements ISimpleFolder {
 
 	public function delete(): void {
 		$this->files = [];
+		$this->folders = [];
 	}
 
 	public function getName(): string {
@@ -121,11 +128,13 @@ final class MemoryFolder implements ISimpleFolder {
 	}
 
 	public function getFolder(string $name): ISimpleFolder {
-		throw new NotFoundException();
+		return $this->folders[$name] ?? throw new NotFoundException();
 	}
 
 	public function newFolder(string $path): ISimpleFolder {
-		throw new RuntimeException('Nested folders are not used in this test');
+		$folder = new self($path);
+		$this->folders[$path] = $folder;
+		return $folder;
 	}
 
 	public function remove(string $name): void {
@@ -189,32 +198,44 @@ function downloadFixture(int $number): array {
 
 $root = new MemoryAppData();
 $cache = new CacheService($root);
-checkCache($cache->count() === 0, 'Empty cache');
-checkCache($cache->store(downloadFixture(1)), 'First image is stored');
-checkCache(!$cache->store(downloadFixture(1)), 'Content-addressed duplicate is ignored');
-checkCache($cache->count() === 1, 'One valid record');
-$first = $cache->select();
+checkCache($cache->count('landscapes') === 0, 'Empty landscape cache');
+checkCache($cache->store('landscapes', downloadFixture(1)), 'First landscape is stored');
+checkCache(!$cache->store('landscapes', downloadFixture(1)), 'Content-addressed duplicate is ignored per theme');
+checkCache($cache->store('animals', downloadFixture(1)), 'Identical content can be stored in another theme cache');
+checkCache($cache->count('landscapes') === 1, 'One valid landscape record');
+checkCache($cache->count('animals') === 1, 'One valid animal record');
+$first = $cache->select('landscapes');
 checkCache($first !== null, 'Stored image is selectable');
+checkCache($first['theme'] === 'landscapes', 'Stored metadata is bound to its theme');
 checkCache($first['author'] === 'Author 1', 'Attribution survives storage');
-checkCache($cache->image((string)$first['id']) !== null, 'Stored image is served locally');
-checkCache($cache->image('../config') === null, 'Invalid image identifier is rejected');
+checkCache($cache->image('landscapes', (string)$first['id']) !== null, 'Stored image is served locally');
+checkCache($cache->image('animals', (string)$first['id']) !== null, 'Other theme serves its own local copy');
+checkCache($cache->image('../space', (string)$first['id']) === null, 'Invalid image theme is rejected');
+checkCache($cache->image('landscapes', '../config') === null, 'Invalid image identifier is rejected');
 
 for ($number = 2; $number <= 10; $number++) {
-	checkCache($cache->store(downloadFixture($number)), 'Unique image ' . $number . ' is stored');
+	checkCache($cache->store('landscapes', downloadFixture($number)), 'Unique image ' . $number . ' is stored');
 }
-$cache->prune(8);
-$records = $cache->listBackgrounds();
+$cache->prune('landscapes', 8);
+$records = $cache->listBackgrounds('landscapes');
 checkCache(count($records) === 8, 'Cache pruning keeps the configured maximum');
 checkCache($records[0]['title'] === 'File:Landscape 10.jpg', 'Newest image remains first');
-checkCache($cache->select((string)$records[0]['id'])['id'] !== $records[0]['id'], 'Previous image is excluded');
+checkCache($cache->select('landscapes', (string)$records[0]['id'])['id'] !== $records[0]['id'], 'Previous image is excluded');
 
 $invalid = downloadFixture(11);
 $invalid['author'] = '<script>bad</script>';
 try {
-	$cache->store($invalid);
+	$cache->store('landscapes', $invalid);
 	checkCache(false, 'Unsafe metadata must throw');
 } catch (InvalidArgumentException $e) {
-	checkCache($cache->count() === 8, 'Unsafe metadata has no visible cache entry');
+	checkCache($cache->count('landscapes') === 8, 'Unsafe metadata has no visible cache entry');
+}
+
+try {
+	$cache->store('invalid', downloadFixture(12));
+	checkCache(false, 'Unknown themes must throw');
+} catch (InvalidArgumentException $e) {
+	checkCache($cache->totalCount() === 9, 'Unknown theme creates no cache entry');
 }
 
 fwrite(STDOUT, sprintf("%d cache checks passed.\n", $checks));

@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-namespace OCA\Wechselbild\Cron;
+namespace OCA\BackgroundChanger\Cron;
 
-use OCA\Wechselbild\Service\RefreshService;
+use OCA\BackgroundChanger\Service\RefreshService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\IJob;
 use OCP\BackgroundJob\TimedJob;
@@ -32,12 +32,12 @@ final class RefreshBackgrounds extends TimedJob {
 		try {
 			$result = $this->refreshService->refresh();
 			$this->logger->info(
-				'Wechselbild refresh completed: {added} added, {after} cached',
-				['app' => 'wechselbild', 'added' => $result['added'], 'after' => $result['after']],
+				'Background Changer refresh completed: {added} added, {after} cached',
+				['app' => 'backgroundchanger', 'added' => $result['added'], 'after' => $result['after']],
 			);
 		} catch (\Throwable $e) {
-			$this->logger->warning('Wechselbild refresh failed: {reason}', [
-				'app' => 'wechselbild',
+			$this->logger->warning('Background Changer refresh failed: {reason}', [
+				'app' => 'backgroundchanger',
 				'reason' => $e->getMessage(),
 			]);
 		}

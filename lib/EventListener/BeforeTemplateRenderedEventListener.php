@@ -3,13 +3,14 @@
 declare(strict_types=1);
 
 /**
- * SPDX-FileCopyrightText: 2026 Christian
+ * SPDX-FileCopyrightText: 2026 chrissi0285
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-namespace OCA\Wechselbild\EventListener;
+namespace OCA\BackgroundChanger\EventListener;
 
-use OCA\Wechselbild\AppInfo\Application;
+use OCA\BackgroundChanger\AppInfo\Application;
+use OCA\BackgroundChanger\Service\ThemeService;
 use OCP\AppFramework\Http\Events\BeforeLoginTemplateRenderedEvent;
 use OCP\AppFramework\Http\Events\BeforeTemplateRenderedEvent;
 use OCP\EventDispatcher\Event;
@@ -25,6 +26,7 @@ final class BeforeTemplateRenderedEventListener implements IEventListener {
 		private IConfig $config,
 		private IUserSession $userSession,
 		private IURLGenerator $urlGenerator,
+		private ThemeService $themes,
 	) {
 	}
 
@@ -40,9 +42,14 @@ final class BeforeTemplateRenderedEventListener implements IEventListener {
 			&& $this->hasPersonalBackground()) {
 			return;
 		}
+		$theme = $this->themes->currentTheme();
+		if ($theme === null) {
+			return;
+		}
 
 		Util::addHeader('meta', [
-			'name' => 'wechselbild-endpoint',
+			'name' => 'backgroundchanger-endpoint',
+			'data-theme' => $theme,
 			'content' => $this->urlGenerator->linkToRouteAbsolute(
 				Application::APP_ID . '.background.select',
 			),
