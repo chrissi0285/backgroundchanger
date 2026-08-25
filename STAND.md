@@ -124,64 +124,164 @@ Quellbäume geprüft:
    Nextcloud-Status, Core- und App-Integrität, Hintergrundjob, lokaler Cache,
    Login, angemeldete Seiten und frisches Nextcloud-Protokoll fehlerfrei.
 
-## Letzter sicherer Checkpoint
+## Signierter Freigabestand
 
-Recherche, Architekturentscheidung, Quellstand und der vollständige isolierte
-RUNI-Test sind abgeschlossen. Produktiv wurde nicht verändert.
+[Nextcloud-PR 1181](https://github.com/nextcloud/app-certificate-requests/pull/1181)
+ist freigegeben und zusammengeführt. Das ausgestellte Zertifikat ist auf den
+eigenen Identifier `wechselbild` begrenzt:
 
-- Der unprivilegierte Gast `wechselbild-nc34-test` lief mit `onboot=0`, Ubuntu
-  26.04, PHP 8.5.4, MariaDB 11.8.6, Apache 2.4.66, Redis 8.0.5 und dem per
-  SHA-256 und PGP geprüften Nextcloud 34.0.3.2.
-- 36 Metadaten-/Identitätsprüfungen und 21 speicherinterne Cachetests sowie
-  sämtliche PHP-, JavaScript-, XML-, Shell- und Paketprüfungen bestanden.
-- Der erste reale Providerlauf zeigte, dass eine 2560-Pixel-Anforderung bei
-  Commons teils 3840-Pixel-Dateien ausliefert. Die korrigierte feste
-  1920-Pixel-Anforderung lieferte anschließend vier Initialbilder und weitere
-  Einzelbilder ohne Zurückweisung. Die Begrenzung blieb bei acht sichtbaren
-  Cacheeinträgen.
-- Auswahl-, Bild-, 404-, 405-, Cache-Header-, Hintergrundjob-, Neustart- und
-  Wiederanlauftests bestanden. Nach einem sauberen Logmarker entstanden bei
-  erneutem echten Abruf keine Warnungen oder Fehler; die Core-Integrität blieb
-  fehlerfrei.
-- Ohne Standardroute war Commons nachweislich unerreichbar, Nextcloud samt
-  Login, Auswahl und lokalen Bildern aber weiter nutzbar. Chrome zeigte bei
-  Login, Dashboard und Dateien drei verschiedene Bilder und erzeugte fünf
-  lokale Auswahl- sowie fünf lokale Bildabrufe, keinen Anbieteraufruf und
-  keine JavaScript-Ausnahme. Die Screenshots wurden tatsächlich angesehen;
-  Kontrast, Navigation, Formulare und Klickziele blieben nutzbar.
-- Ein testweise gesetzter persönlicher Nextcloud-Hintergrund unterdrückte
-  Wechselbild vollständig und ohne Netzaufruf. Der vorher nicht vorhandene
-  Benutzerwert wurde danach wieder exakt gelöscht.
+- Betreff: `CN=wechselbild`
+- Aussteller: `Nextcloud Code Signing Intermediate Authority`
+- SHA-256-Fingerabdruck:
+  `EF:96:9E:0E:FB:99:DA:11:CB:91:B3:AB:D1:07:1C:22:EB:1B:43:AE:CB:08:52:02:62:2B:0B:F3:85:A8:85:07`
+- Der private 4096-Bit-Schlüssel liegt ausschließlich mit Modus 600 unter
+  `/home/chrissi/llmo/secrets/wechselbild.key`. Er wurde weder nach RUNI noch
+  auf die produktive Nextcloud kopiert und ist nicht Bestandteil von Git,
+  Paket, Protokoll oder Bildschirmbeleg.
 
-Der öffentliche Quellstand liegt unter
-<https://github.com/chrissi0285/wechselbild>. Der DCO-geprüfte offizielle
-Zertifikatsantrag ist [Nextcloud-PR 1181](https://github.com/nextcloud/app-certificate-requests/pull/1181).
-Der private 4096-Bit-Schlüssel liegt ausschließlich mit Modus 600 unter
-`/home/chrissi/llmo/secrets/wechselbild.key`. Solange Nextcloud den PR nicht
-freigegeben hat, wird bewusst kein Paket als signiert ausgegeben und nichts
-produktiv installiert.
+Die signierten Laufzeitpakete enthalten jeweils genau 19 Dateien: 18
+Laufzeitdateien und `appinfo/signature.json`, aber keine Tests, Git-Daten,
+Arbeitsdokumente, Zertifikatsanträge oder Schlüssel.
 
-Am 24. August 2026 wurde der Abschlussstand erneut geprüft:
+- `build/wechselbild-1.0.0-signed.tar.gz`:
+  SHA-256 `1f5d443e4041376a164797aafca500c179f564158809158a4cbbf01fa7a5a212`
+- `build/wechselbild-1.0.1-signed.tar.gz`:
+  SHA-256 `051bd26d9000ee668bc2f12cb6dba5aef538de57aad3a49c5196722d74375f4d`
 
-- Commit `786a3ee` liegt unverändert auf dem öffentlichen Hauptzweig. Das aus
-  genau diesem Stand erzeugte Archiv
-  `build/wechselbild-1.0.0-unsigned.tar.gz` hat SHA-256
-  `34819cd9fd96edc6e0fb62a14838fdaa0fd9cca8c053118e3408691a7659a875`.
-  Es enthält 18 Dateien, keine Tests, Git-Daten, Signaturdatei oder privaten
-  Schlüssel. Im Nextcloud-34-Gast waren alle Paketdateien bytegleich mit dem
-  vollständig getesteten Laufzeitbaum; PHP-, JavaScript- und XML-Prüfung
-  bestanden auch direkt am entpackten Paket.
-- Zertifikats-PR 1181 ist offen. Die DCO-Prüfung ist erfolgreich, der PR ist
-  aber bis zur Nextcloud-Prüfung blockiert; es gibt noch keine Freigabe und
-  kein App-Zertifikat. Das ist der einzige verbleibende externe Blocker vor
-  Signierung, letzter RUNI-Integritätsprüfung des signierten Pakets und einer
-  möglichen produktiven Installation.
-- Der temporäre Gast 100, sein logischer Datenträger und das ausschließlich
-  für diesen Test geladene Ubuntu-26.04-Abbild wurden vollständig entfernt.
-  RUNI wurde danach geordnet heruntergefahren und war anschließend nicht mehr
-  per SSH erreichbar. CT2099 wurde zu keinem Zeitpunkt betreten oder
-  verändert.
-- Produktiv wurde abschließend erneut nur lesend geprüft: Nextcloud läuft als
-  34.0.3.2, Wartungsmodus und Datenbank-Upgradebedarf sind aus, Core- und
-  `unsplash`-Integrität sind sauber, `unsplash` bleibt deaktiviert auf 3.1.0
-  und `wechselbild` ist weder als App registriert noch als Ordner vorhanden.
+Version 1.0.1 ist der kleinste notwendige Nachtrag. Ein Regressionstest gegen
+die signierte 1.0.0 reproduzierte bei drei Navigationen fünf statt drei
+Auswahlabrufe. Ursache war ein sofortiger Aufruf zusammen mit dem späteren
+`pageshow`-Ereignis. Commit `d065845` entfernt nur den doppelten Erstaufruf;
+danach erzeugen drei Seiten exakt drei Auswahl- und drei Bildabrufe.
+
+## Isolierte Abnahme auf RUNI
+
+Der vollständige Freigabepfad wurde vor Produktion in Gast 102
+`wechselbild-nc34-signed-test` geprüft. Der Gast war unprivilegiert, hatte
+`onboot=0` und lief mit Nextcloud 34.0.3.2, Ubuntu 26.04, PHP 8.5.4,
+Apache 2.4.66, MariaDB 11.8.6 und Redis 8.0.5.
+
+- 36 Unit-/Identitätsprüfungen, 21 speicherinterne Cacheprüfungen sowie alle
+  PHP-, JavaScript-, XML-, Shell-, Paket- und Geheimnisprüfungen bestanden.
+- Nextcloud akzeptierte sowohl die Neuinstallation als auch das offizielle
+  Update auf 1.0.1. Core- und App-Integrität blieben sauber.
+- Der echte Commons-Lauf hielt den Cache bei höchstens acht geprüften Bildern;
+  Routen, 404/405-Verhalten, MIME-Typen und Cache-Header stimmten.
+- Mit entfernter Standardroute war Wikimedia unerreichbar. Login, Dashboard
+  und Dateien zeigten weiterhin drei verschiedene lokale Bilder mit genau
+  drei Auswahl- und drei Bildabrufen, null Anbieterabrufen und null
+  JavaScript-Ausnahmen. Die Offline-Screenshots wurden visuell geprüft.
+- Ein persönlicher Nextcloud-Hintergrund unterdrückte Wechselbild vollständig.
+  Der zuvor nicht vorhandene Benutzerwert wurde danach wieder exakt entfernt.
+- Der vollständige Rückweg auf die signierte 1.0.0 und das erneute offizielle
+  Update auf 1.0.1 bestanden. Dabei wurde belegt, dass neben dem atomaren
+  Dateitausch auch `installed_version=1.0.0` gesetzt werden muss; ein bloßer
+  Code-Rücktausch würde Nextcloud sonst zu Recht als ausstehendes Upgrade
+  behandeln.
+- Nach einem Gastneustart bestanden Status, Dienste, Integrität, Cache,
+  Hintergrundjob und Webzugriff erneut. Der abschließend abgegrenzte
+  Logabschnitt enthielt keine Warnung und keinen Fehler.
+
+Gast 102 wurde nach erneuter Endprüfung geordnet gestoppt und mit seiner
+Konfiguration, dem Haupt-LV und dem Test-Snapshot-LV gelöscht. Der ausschließlich
+zugehörige Transferordner und das Ubuntu-Template wurden entfernt. RUNI wurde
+danach über `systemctl poweroff` heruntergefahren und war nach sechs Prüfungen
+nicht mehr per SSH erreichbar. CT2099 und andere Gäste wurden nicht betreten,
+geprüft oder einzeln gestoppt.
+
+## Produktiver Stand vom 25. August 2026
+
+Wechselbild 1.0.1 ist auf der produktiven Nextcloud aktiviert. Die alte App
+`unsplash` bleibt unverändert und deaktiviert auf 3.1.0; sie wurde weder
+gelöscht noch umsigniert.
+
+- Nextcloud meldet 34.0.3.2, `maintenance: false` und
+  `needsDbUpgrade: false`. Der vom offiziellen `occ upgrade` vorübergehend
+  gesetzte Wartungsmodus wurde von diesem wieder aufgehoben und anschließend
+  mehrfach unabhängig geprüft.
+- Apache, MariaDB und Redis sind aktiv; es gibt keine fehlgeschlagene
+  systemd-Einheit. `/mnt/ceds` ist lesbar als vorgesehene NFS-4.2-Freigabe
+  `172.16.0.24:/ceds` eingebunden.
+- Aktiver Code, registrierte und deklarierte Version sind 1.0.1. Der aktive
+  Baum ist über alle 19 Dateien bytegleich zum signierten 1.0.1-Paket.
+  Nextclouds Core-, Wechselbild-, `logcleaner`- und `unsplash`-
+  Integritätsprüfungen bestehen.
+- Genau ein Job `OCA\Wechselbild\Cron\RefreshBackgrounds` ist registriert.
+  Seine erzwungene produktive Probe lief in zwei Sekunden, ergänzte genau ein
+  Bild und setzte den nächsten Lauf auf 06:46 UTC. Dabei entstanden weder
+  Nextcloud-Warnung noch Apache-Fehler.
+- Der AppData-Cache enthält danach sechs Metadaten-/Bildpaare. IDs,
+  SHA-256-Werte, MIME-Typen, Abmessungen, Landschaftsformat, Dateizuordnung,
+  Commons-Quelle und Creative-Commons-Lizenz stimmen; es gibt kein verwaistes
+  Bild.
+- Login, lokale Auswahl und lokales Bild liefern HTTP 200. Die Auswahl ist
+  `no-store`; das Bild ist `public, max-age=604800, immutable`. Der gelieferte
+  Bildhash stimmt bytegenau mit den AppData-Metadaten überein. Im dazu frisch
+  abgegrenzten Nextcloud- und Apache-Protokoll entstanden null Warnungen,
+  null `logcleaner`-Routenfehler und null Apache-Fehler.
+- Ein isolierter Chromium-Lauf gegen die Produktion lud drei anonyme
+  Loginseiten mit drei verschiedenen IDs, exakt drei lokalen Auswahl- und
+  drei lokalen Bildabrufen, null Anbieterabrufen und null JavaScript-Ausnahmen.
+
+Die auf Produktion kopierten Archive und der alte Bereitstellungsmarker unter
+`/var/tmp` wurden nach Hash-, Pfad- und Benutzungsprüfung entfernt. Als
+unmittelbarer Rückweg bleibt
+`/var/www/nextcloud/apps/.wechselbild-1.0.0-rollback` erhalten. Dieser Baum ist
+über alle 19 Dateien bytegleich zum signierten 1.0.0-Paket, enthält keine
+Datenbankdefinition und wird von Nextcloud nicht als zweite App registriert.
+
+Der geprüfte Rückweg lautet: Wartungsmodus einschalten und verifizieren,
+`installed_version` auf 1.0.0 setzen, den aktiven 1.0.1-Baum rücksetzbar
+beiseiteschieben, den geprüften 1.0.0-Baum atomar an die aktive Stelle setzen,
+`occ upgrade --no-interaction` ausführen und erst nach Status-, Dienst-, NFS-,
+Integritäts- und Webprüfung den Wartungsmodus wieder ausschalten. Bei einem
+Fehler wird der Dateitausch umgekehrt und `installed_version` wieder auf 1.0.1
+gesetzt. Dieser vollständige Ablauf wurde auf RUNI ausgeführt; auf Produktion
+wurde er wegen des fehlerfreien 1.0.1-Zustands nicht unnötig ausgelöst.
+
+## Unerwartetes `logcleaner`-Update
+
+Der offizielle Nextcloud-Updater aktualisierte während `occ upgrade`
+automatisch die bereits aktivierte App `logcleaner` von 1.5.8 auf 1.5.9. Das
+ist durch die Core-Logik `upgradeAppStoreApps`, die Updater-Ereignisse und den
+vorher/nachher gebildeten App-Inventarhash belegt. Wird im aktuellen Inventar
+nur `logcleaner` wieder als 1.5.8 eingesetzt, entsteht exakt der Vorabhash;
+keine weitere fremde App änderte ihre Version.
+
+1.5.9 wurde am selben Tag offiziell veröffentlicht. Der Upstream-Vergleich
+1.5.8…1.5.9 umfasst sechs Dateien und ersetzt dynamische Shellbefehle in
+`Helper.php` und `LogsController.php` durch PHP-Dateioperationen, reduziert
+den Speicherbedarf beim Zeilenzählen und repariert das Einstellungsmenü unter
+Nextcloud 34. Die installierte Ausgabe besteht Nextclouds Integritätsprüfung
+mit `CN=logcleaner`, ausgestellt von der Nextcloud Code Signing Intermediate
+Authority; ihr SHA-256-Zertifikatsfingerabdruck lautet
+`FF:2B:76:3C:A4:86:4C:4E:B9:B9:3F:15:8D:22:10:BE:C9:BA:EA:5E:C6:EE:BF:11:EB:4C:9E:1C:8A:FC:F9:04`.
+Ein Rücksetzen auf 1.5.8 wäre damit ein unbegründeter Sicherheitsrückschritt;
+1.5.9 bleibt aktiv.
+
+Während des vom Updater gesetzten Wartungsmodus protokollierten bestehende
+Clients neun DAV-Ausnahmen „System befindet sich im Wartungsmodus“ und drei
+Hinweise auf die in dieser Phase noch nicht geladene Route
+`logcleaner.page.index`. Nach Ende des Wartungsmodus liefen 17 weitere
+`/index.php/204`-Anfragen von 01:24 bis 02:51 Uhr ohne erneuten Routenhinweis; auch
+`router:match` löst die Route nun korrekt auf. Eine spätere einzelne
+PHP-Fehlermeldung um 00:08 UTC stammt nachweislich von einem fehlerhaften
+manuellen, rein lesenden Prüfaufruf dieser Sitzung und nicht von einer App.
+Alle danach frisch abgegrenzten Produktprüfungen blieben fehlerfrei.
+
+## Noch ausstehender sichtbarer Normalbrowser-Beleg
+
+Der normale Chrome befindet sich unverändert auf
+`Geplante Aufgaben - Google Chrome`. Zwei Versuche hinter dem aktiven
+Cinnamon-Sperrbildschirm brachen korrekt vor einem belegten eigenen Tab ab;
+es wurde weder navigiert noch ein Tab geschlossen. Zwei beim ersten
+Fehlversuch entstandene private Fehlaufnahmen wurden entfernt und werden nicht
+als Produktbeleg gewertet.
+
+Der technische und isolierte Browserbefund ist vollständig grün. Der einzige
+noch offene Abnahmepunkt ist ein beschnittener Seitenbeleg im vorhandenen
+normalen Chrome. Er darf erst im ersten entsperrten Abwesenheitsfenster unter
+dem gemeinsamen GUI-Guard entstehen: eigener Tab muss vorab unabhängig
+belegt sein, die Ziel-URL muss im Produktlog HTTP 200 sowie genau einen
+Auswahl- und einen Bildabruf zeigen, danach wird nur dieser Tab geschlossen
+und der ursprüngliche Chrome-Titel verifiziert.

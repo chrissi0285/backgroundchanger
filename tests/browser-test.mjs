@@ -168,6 +168,43 @@ if (mode === 'personal') {
 	process.exit(0)
 }
 
+if (mode === 'guest') {
+	const pages = []
+	for (let page = 1; page <= 3; page++) {
+		await navigate(`${nextcloudBase}/login?wechselbild-product-check=${page}`)
+		await waitFor(`document.querySelector('input[name="user"]') && document.querySelector('input[name="password"]')`)
+		await waitForBackground()
+		pages.push(await snapshot())
+		await screenshot(`product-login-${page}`)
+	}
+
+	const providerHosts = requests
+		.filter(url => url.startsWith('http://') || url.startsWith('https://'))
+		.map(url => new URL(url).hostname)
+		.filter(host => /(?:wikimedia|wikimedia\.org|creativecommons\.org|unsplash|wallhaven|bing)/i.test(host))
+	const selectionRequests = requests.filter(url => url.includes('/apps/wechselbild/api/background'))
+	const imageRequests = requests.filter(url => url.includes('/apps/wechselbild/api/image/'))
+
+	assert(pages.every(page => page.metaCount === 1), 'Each login page must contain exactly one endpoint meta tag')
+	assert(pages.every(page => page.creditText.length > 0), 'Each login page must show attribution')
+	assert(pages.every(page => page.bodyBackground.includes('wechselbild')), 'Each login page must use a local Wechselbild image')
+	assert(new Set(pages.map(page => page.id)).size === pages.length, 'Consecutive login pages must use different images')
+	assert(selectionRequests.length === pages.length, `Each login page must request exactly one local selection, got ${selectionRequests.length}`)
+	assert(imageRequests.length === pages.length, `Each login page must request exactly one local image, got ${imageRequests.length}`)
+	assert(providerHosts.length === 0, `Browser contacted a provider: ${providerHosts.join(', ')}`)
+	assert(exceptions.length === 0, `Browser exceptions: ${exceptions.join('; ')}`)
+
+	console.log(JSON.stringify({
+		pages,
+		selectionRequests: selectionRequests.length,
+		imageRequests: imageRequests.length,
+		providerRequests: providerHosts.length,
+		exceptions,
+	}, null, 2))
+	socket.close()
+	process.exit(0)
+}
+
 await navigate(`${nextcloudBase}/login`)
 await waitFor(`document.querySelector('input[name="user"]') && document.querySelector('input[name="password"]')`)
 await waitForBackground()
