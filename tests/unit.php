@@ -129,6 +129,12 @@ $svg = file_get_contents(__DIR__ . '/../img/app.svg');
 expect(is_string($svg) && str_contains($svg, '867c66e8d84bc2ee279fa2a85a6a4659160db9091c6a18ae01566aa7de2a3e99'), 'Central symbol provenance');
 $script = file_get_contents(__DIR__ . '/../js/background.js');
 expect(is_string($script) && str_contains($script, 'designed by chrissi0285'), 'Exact visible design line');
+expect(is_string($script)
+	&& str_contains($script, "document.addEventListener('click'")
+	&& str_contains($script, 'event.defaultPrevented && routeRevision === revision')
+	&& str_contains($script, "window.addEventListener('popstate', routeChanged)")
+	&& str_contains($script, "window.addEventListener('hashchange', routeChanged)"),
+	'Link, router and browser-history navigation share the rotation lifecycle');
 $settingsScript = file_get_contents(__DIR__ . '/../js/settings.js');
 expect(is_string($settingsScript)
 	&& str_contains($settingsScript, "/apps/backgroundchanger/api/theme")

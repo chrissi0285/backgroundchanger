@@ -1,10 +1,12 @@
 # Background Changer
 
 Background Changer shows rotating Wikimedia Commons backgrounds on Nextcloud
-34. It rotates on page loads, in-page navigation and every five minutes while
-the page is visible. Images are validated and served from small local caches;
-the browser never contacts an image provider. Cached images remain available
-when the server is temporarily offline.
+34. It rotates on page loads, same-origin link clicks, internal router changes,
+browser Back/Forward and every five minutes while the page is visible. Clicking
+an already active Nextcloud route also selects a new background. Images are
+validated and served from small local caches; the browser never contacts an
+image provider. Cached images remain available when the server is temporarily
+offline.
 
 ## Themes
 

@@ -123,13 +123,128 @@ async function waitFor(expression, timeout = 20_000) {
 async function changesFrom(id, timeout = 4_000) {
 	const deadline = Date.now() + timeout
 	while (Date.now() < deadline) {
-		const current = await evaluate(`sessionStorage.getItem('backgroundchanger-last-' + document.documentElement.dataset.backgroundchangerTheme) || ''`)
-		if (current && current !== id) {
-			return current
+		try {
+			const current = await evaluate(`sessionStorage.getItem('backgroundchanger-last-' + document.documentElement.dataset.backgroundchangerTheme) || ''`)
+			if (current && current !== id) {
+				return current
+			}
+		} catch (error) {
+			if (!/context|navigated|Uncaught/i.test(error.message)) {
+				throw error
+			}
 		}
 		await sleep(100)
 	}
 	return ''
+}
+
+async function realClick(target) {
+	await command('Input.dispatchMouseEvent', {
+		type: 'mouseMoved',
+		x: target.x,
+		y: target.y,
+	})
+	await command('Input.dispatchMouseEvent', {
+		type: 'mousePressed',
+		x: target.x,
+		y: target.y,
+		button: 'left',
+		buttons: 1,
+		clickCount: 1,
+	})
+	await sleep(50)
+	await command('Input.dispatchMouseEvent', {
+		type: 'mouseReleased',
+		x: target.x,
+		y: target.y,
+		button: 'left',
+		buttons: 0,
+		clickCount: 1,
+	})
+}
+
+async function currentFilesRouteTarget() {
+	return evaluate(`(async () => {
+		const canonicalPath = path => path.replace(/\\/+$/, '') || '/'
+		const anchors = [...document.querySelectorAll(
+			'#app-navigation a[href], .app-navigation a[href], [data-cy-files-navigation] a[href]',
+		)]
+		for (const anchor of anchors) {
+			let destination
+			try {
+				destination = new URL(anchor.href, location.href)
+			} catch {
+				continue
+			}
+			if (destination.origin !== location.origin
+				|| canonicalPath(destination.pathname) !== canonicalPath(location.pathname)
+				|| destination.search !== location.search) continue
+			anchor.scrollIntoView({ block: 'center', inline: 'nearest' })
+			await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+			const bounds = anchor.getBoundingClientRect()
+			if (bounds.width <= 0 || bounds.height <= 0
+				|| bounds.left < 0 || bounds.top < 0
+				|| bounds.right > innerWidth || bounds.bottom > innerHeight) continue
+			const x = bounds.left + bounds.width / 2
+			const y = bounds.top + bounds.height / 2
+			const hit = document.elementFromPoint(x, y)
+			if (!(hit === anchor || anchor.contains(hit))) continue
+			return { x, y, pathname: destination.pathname, search: destination.search }
+		}
+		return null
+	})()`)
+}
+
+async function filesFolderTarget() {
+	return evaluate(`(async () => {
+		const entries = [...document.querySelectorAll(
+			'.files-list__row-name-link, [data-cy-files-list-row-name-link]',
+		)]
+		const target = entries.find(entry => entry.closest('[data-mime="httpd/unix-directory"]')
+			|| entry.closest('[data-type="dir"]')) || entries[0]
+		if (!target) return null
+		target.scrollIntoView({ block: 'center', inline: 'nearest' })
+		await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+		const bounds = target.getBoundingClientRect()
+		if (bounds.width <= 0 || bounds.height <= 0) return null
+		const x = bounds.left + bounds.width / 2
+		const y = bounds.top + bounds.height / 2
+		const hit = document.elementFromPoint(x, y)
+		if (!(hit === target || target.contains(hit))) return null
+		return { x, y }
+	})()`)
+}
+
+async function appMenuRouteTarget(pathFragment) {
+	const trigger = await evaluate(`(async () => {
+		const target = document.querySelector('.app-menu .app-menu__current-app')
+		if (!target) return null
+		const bounds = target.getBoundingClientRect()
+		if (bounds.width <= 0 || bounds.height <= 0) return null
+		const x = bounds.left + bounds.width / 2
+		const y = bounds.top + bounds.height / 2
+		const hit = document.elementFromPoint(x, y)
+		if (!(hit === target || target.contains(hit))) return null
+		return { x, y }
+	})()`)
+	if (!trigger) {
+		return null
+	}
+	await realClick(trigger)
+	await waitFor(`[...document.querySelectorAll('a.app-item[href], #appmenu a[href]')]
+		.some(anchor => new URL(anchor.href, location.href).pathname.includes(${JSON.stringify(pathFragment)}))`)
+	return evaluate(`(async () => {
+		const target = [...document.querySelectorAll('a.app-item[href], #appmenu a[href]')]
+			.find(anchor => new URL(anchor.href, location.href).pathname.includes(${JSON.stringify(pathFragment)}))
+		if (!target) return null
+		const bounds = target.getBoundingClientRect()
+		if (bounds.width <= 0 || bounds.height <= 0) return null
+		const x = bounds.left + bounds.width / 2
+		const y = bounds.top + bounds.height / 2
+		const hit = document.elementFromPoint(x, y)
+		if (!(hit === target || target.contains(hit))) return null
+		return { x, y }
+	})()`)
 }
 
 async function navigate(url) {
@@ -328,6 +443,202 @@ await command('Emulation.setDeviceMetricsOverride', {
 	deviceScaleFactor: 1,
 	mobile: false,
 })
+
+if (mode === 'navigation') {
+	await navigate(`${nextcloudBase}/login`)
+	await waitFor(`document.querySelector('input[name="user"]') && document.querySelector('input[name="password"]')`)
+	await waitForBackground()
+	await submitLogin()
+	await navigate(`${nextcloudBase}/index.php/apps/files/files`)
+	await waitForBackground()
+	await dismissOnboarding()
+
+	const before = await snapshot()
+	const selectionsBefore = requests.filter(url => url.includes('/apps/backgroundchanger/api/background')).length
+	const activeTarget = await currentFilesRouteTarget()
+	assert(activeTarget, 'Files must expose a visible current-route navigation link')
+	await realClick(activeTarget)
+	const afterId = await changesFrom(before.id, 5_000)
+	const selectionsAfter = requests.filter(url => url.includes('/apps/backgroundchanger/api/background')).length
+
+	console.log(JSON.stringify({
+		currentRouteClick: {
+			pathname: activeTarget.pathname,
+			search: activeTarget.search,
+			beforeId: before.id,
+			afterId,
+			selectionDelta: selectionsAfter - selectionsBefore,
+		},
+		exceptions,
+	}, null, 2))
+	assert(afterId !== '', 'A real click on the current Files route must change the background')
+	assert(selectionsAfter === selectionsBefore + 1,
+		'A real click on the current Files route must request exactly one new selection')
+	assert(exceptions.length === 0, `Browser exceptions: ${exceptions.join('; ')}`)
+	await logout()
+	socket.close()
+	process.exit(0)
+}
+
+if (mode === 'navigation-full') {
+	const selectionCount = () => requests.filter(url => url.includes('/apps/backgroundchanger/api/background')).length
+	const imageCount = () => requests.filter(url => url.includes('/apps/backgroundchanger/api/image/')).length
+	const captureState = async name => {
+		await waitForBackground()
+		const state = await snapshot()
+		assert(state.readyId === state.id, `${name} must paint only its decoded selection`)
+		assert(state.creditText.includes('designed by chrissi0285'), `${name} must show the exact design line`)
+		state.screenshotHash = await screenshot(name)
+		return state
+	}
+
+	await navigate(`${nextcloudBase}/login`)
+	await waitFor(`document.querySelector('input[name="user"]') && document.querySelector('input[name="password"]')`)
+	await waitForBackground()
+	await submitLogin()
+	if (!await evaluate(`location.pathname.includes('/apps/dashboard')`)) {
+		await navigate(`${nextcloudBase}/index.php/apps/dashboard/`)
+	}
+	await dismissOnboarding()
+	const states = []
+	states.push({ name: 'dashboard', ...await captureState('navigation-dashboard') })
+
+	let beforeSelections = selectionCount()
+	let beforeId = states.at(-1).id
+	const filesMenuTarget = await appMenuRouteTarget('/apps/files')
+	assert(filesMenuTarget, 'The real app menu must expose Files as a visible mouse target')
+	await realClick(filesMenuTarget)
+	await waitFor(`location.pathname.includes('/apps/files/files')`)
+	assert(await changesFrom(beforeId, 10_000) !== '', 'Dashboard-to-Files app-menu navigation must change the background')
+	states.push({ name: 'files', ...await captureState('navigation-files') })
+	assert(selectionCount() === beforeSelections + 1,
+		'Dashboard-to-Files app-menu navigation must request exactly one selection')
+
+	beforeSelections = selectionCount()
+	beforeId = states.at(-1).id
+	const activeFilesTarget = await currentFilesRouteTarget()
+	assert(activeFilesTarget, 'Files must expose its visible current-route navigation link')
+	await realClick(activeFilesTarget)
+	assert(await changesFrom(beforeId, 5_000) !== '', 'Repeated real Files route click must change the background')
+	states.push({ name: 'files-current', ...await captureState('navigation-files-current') })
+	assert(selectionCount() === beforeSelections + 1,
+		'Repeated real Files route click must request exactly one selection')
+
+	const filesUrl = states.at(-1).url
+	beforeSelections = selectionCount()
+	beforeId = states.at(-1).id
+	const folderTarget = await filesFolderTarget()
+	assert(folderTarget, 'Files must expose a visible in-app folder route')
+	await realClick(folderTarget)
+	await waitFor(`location.href !== ${JSON.stringify(filesUrl)}`)
+	assert(await changesFrom(beforeId, 10_000) !== '', 'Real Files router navigation must change the background')
+	states.push({ name: 'files-folder', ...await captureState('navigation-files-folder') })
+	assert(selectionCount() === beforeSelections + 1,
+		'Real Files router navigation must request exactly one selection')
+	const folderUrl = states.at(-1).url
+
+	let historyState = await command('Page.getNavigationHistory')
+	const backEntry = historyState.entries
+		.slice(0, historyState.currentIndex)
+		.reverse()
+		.find(entry => entry.url === filesUrl)
+	assert(backEntry, 'Browser history must retain the Files root route')
+	beforeSelections = selectionCount()
+	beforeId = states.at(-1).id
+	await command('Page.navigateToHistoryEntry', { entryId: backEntry.id })
+	assert(await changesFrom(beforeId, 10_000) !== '', 'Browser Back must change the background')
+	states.push({ name: 'history-back', ...await captureState('navigation-history-back') })
+	assert(states.at(-1).url !== folderUrl && states.at(-1).url.includes('/apps/files/files'),
+		'Browser Back must visibly return to a different Files route')
+	assert(selectionCount() === beforeSelections + 1, 'Browser Back must request exactly one selection')
+
+	historyState = await command('Page.getNavigationHistory')
+	const forwardEntry = historyState.entries
+		.slice(historyState.currentIndex + 1)
+		.find(entry => entry.url === folderUrl)
+	assert(forwardEntry, 'Browser history must retain the Files folder route')
+	beforeSelections = selectionCount()
+	beforeId = states.at(-1).id
+	await command('Page.navigateToHistoryEntry', { entryId: forwardEntry.id })
+	assert(await changesFrom(beforeId, 10_000) !== '', 'Browser Forward must change the background')
+	states.push({ name: 'history-forward', ...await captureState('navigation-history-forward') })
+	assert(states.at(-1).url !== states.at(-2).url && states.at(-1).url.includes('/apps/files/files'),
+		'Browser Forward must visibly restore the later Files route')
+	assert(selectionCount() === beforeSelections + 1, 'Browser Forward must request exactly one selection')
+
+	beforeSelections = selectionCount()
+	beforeId = states.at(-1).id
+	const dashboardMenuTarget = await appMenuRouteTarget('/apps/dashboard')
+	assert(dashboardMenuTarget, 'The real app menu must expose Dashboard as a visible mouse target')
+	await realClick(dashboardMenuTarget)
+	await waitFor(`location.pathname.includes('/apps/dashboard')`)
+	assert(await changesFrom(beforeId, 10_000) !== '', 'Files-to-Dashboard app-menu navigation must change the background')
+	states.push({ name: 'dashboard-return', ...await captureState('navigation-dashboard-return') })
+	assert(selectionCount() === beforeSelections + 1,
+		'Files-to-Dashboard app-menu navigation must request exactly one selection')
+
+	for (let index = 1; index < states.length; index++) {
+		assert(states[index].id !== states[index - 1].id,
+			`${states[index].name} must not repeat the immediately preceding background`)
+	}
+
+	await navigate(`${nextcloudBase}/index.php/settings/user/theming`)
+	await waitFor(`document.querySelector('.settings-section.background')`, 30_000)
+	await dismissOnboarding()
+	const personalResponsesBefore = responses.filter(response => response.url.includes('/apps/theming/background/shipped')).length
+	const personalTarget = await personalBackgroundControl()
+	assert(personalTarget?.ariaLabel, 'A visible Nextcloud personal background must be selectable')
+	await realClick(personalTarget)
+	const personalDeadline = Date.now() + 10_000
+	while (responses.filter(response => response.url.includes('/apps/theming/background/shipped')).length <= personalResponsesBefore
+		&& Date.now() < personalDeadline) {
+		await sleep(100)
+	}
+	const personalResponses = responses
+		.filter(response => response.url.includes('/apps/theming/background/shipped'))
+		.slice(personalResponsesBefore)
+	assert(personalResponses.length === 1 && personalResponses[0].status === 200,
+		'The real Nextcloud personal background write must receive HTTP 200')
+
+	const selectionsBeforePersonal = selectionCount()
+	const imagesBeforePersonal = imageCount()
+	await navigate(`${nextcloudBase}/index.php/apps/dashboard/`)
+	await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+	const personal = await snapshot()
+	personal.screenshotHash = await screenshot('navigation-personal-background')
+	assert(personal.metaCount === 0, 'A personal Nextcloud background must suppress the endpoint')
+	assert(personal.creditText === '', 'A personal Nextcloud background must suppress app attribution')
+	assert(!personal.background.includes('/apps/backgroundchanger/'),
+		'A personal Nextcloud background must suppress Background Changer CSS')
+	assert(selectionCount() === selectionsBeforePersonal,
+		'A personal Nextcloud background must suppress Background Changer selections')
+	assert(imageCount() === imagesBeforePersonal,
+		'A personal Nextcloud background must suppress Background Changer images')
+	const personalResult = {
+		backgroundLabel: personalTarget.ariaLabel,
+		metaCount: personal.metaCount,
+		creditText: personal.creditText,
+		selectionDelta: selectionCount() - selectionsBeforePersonal,
+		imageDelta: imageCount() - imagesBeforePersonal,
+		screenshotHash: personal.screenshotHash,
+	}
+
+	const providerHosts = requests
+		.filter(url => url.startsWith('http://') || url.startsWith('https://'))
+		.map(url => new URL(url).hostname)
+		.filter(host => /(?:wikimedia|wikimedia\.org|creativecommons\.org|unsplash|wallhaven|bing)/i.test(host))
+	assert(providerHosts.length === 0, `Browser contacted a provider: ${providerHosts.join(', ')}`)
+	assert(exceptions.length === 0, `Browser exceptions: ${exceptions.join('; ')}`)
+	await logout()
+	console.log(JSON.stringify({
+		navigationStates: states,
+		personal: personalResult,
+		providerRequests: 0,
+		exceptions,
+	}, null, 2))
+	socket.close()
+	process.exit(0)
+}
 
 if (mode === 'lifecycle' || mode === 'lifecycle-local') {
 	await command('Page.addScriptToEvaluateOnNewDocument', {

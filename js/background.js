@@ -19,8 +19,11 @@
 	}
 
 	const ROTATION_INTERVAL_MS = 5 * 60 * 1000
+	const NAVIGATION_GRACE_MS = 250
 	let activeRequest = null
 	let rotationTimer = null
+	let linkNavigationTimer = null
+	let routeRevision = 0
 	let pageShown = false
 
 	function sameOriginUrl(value) {
@@ -220,13 +223,45 @@
 		}, 0)
 	}
 
+	function routeChanged() {
+		routeRevision++
+		if (linkNavigationTimer !== null) {
+			window.clearTimeout(linkNavigationTimer)
+			linkNavigationTimer = null
+		}
+		scheduleRotation()
+	}
+
+	document.addEventListener('click', event => {
+		if (!pageShown || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+			return
+		}
+		const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null
+		const target = anchor?.getAttribute('target')?.toLowerCase() || ''
+		if (!anchor || anchor.hasAttribute('download') || (target !== '' && target !== '_self')
+			|| anchor.getAttribute('aria-disabled') === 'true' || !sameOriginUrl(anchor.href)) {
+			return
+		}
+
+		const revision = routeRevision
+		if (linkNavigationTimer !== null) {
+			window.clearTimeout(linkNavigationTimer)
+		}
+		linkNavigationTimer = window.setTimeout(() => {
+			linkNavigationTimer = null
+			if (event.defaultPrevented && routeRevision === revision) {
+				scheduleRotation()
+			}
+		}, NAVIGATION_GRACE_MS)
+	}, true)
+
 	for (const method of ['pushState', 'replaceState']) {
 		const original = window.history[method]
 		window.history[method] = function (...args) {
 			const previous = window.location.href
 			const result = Reflect.apply(original, this, args)
 			if (pageShown && window.location.href !== previous) {
-				scheduleRotation()
+				routeChanged()
 			}
 			return result
 		}
@@ -236,8 +271,8 @@
 		pageShown = true
 		scheduleRotation()
 	})
-	window.addEventListener('popstate', scheduleRotation)
-	window.addEventListener('hashchange', scheduleRotation)
+	window.addEventListener('popstate', routeChanged)
+	window.addEventListener('hashchange', routeChanged)
 	document.addEventListener('visibilitychange', () => {
 		if (document.visibilityState === 'visible') {
 			scheduleRotation()
