@@ -1,6 +1,6 @@
 # Changelog
 
-## Background Changer 1.0.0 (unreleased)
+## ImageChanger 1.0.0 (unreleased)
 
 - Introduce the independent `backgroundchanger` identifier and
   `OCA\BackgroundChanger` namespace.
@@ -8,9 +8,10 @@
   and Architecture in Nextcloud's appearance settings.
 - Keep separate bounded local caches and Commons category allow-lists per
   visual theme.
-- Rotate after page loads, same-origin link and router navigation (including a
-  repeated current-route click), browser history changes and every five
-  minutes, with local image delivery and complete attribution.
+- Rotate after page loads, same-origin links, internal router navigation,
+  semantic non-link menu controls (including repeated current-route clicks),
+  browser history changes and every five minutes, with local image delivery and
+  complete attribution.
 - Derive the app icon from the central `chrissi0285` symbol and display
   `designed by chrissi0285`.
 - Use `chrissi0285` exclusively in public author and copyright metadata.

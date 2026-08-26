@@ -32,11 +32,11 @@ final class RefreshBackgrounds extends TimedJob {
 		try {
 			$result = $this->refreshService->refresh();
 			$this->logger->info(
-				'Background Changer refresh completed: {added} added, {after} cached',
+				'ImageChanger refresh completed: {added} added, {after} cached',
 				['app' => 'backgroundchanger', 'added' => $result['added'], 'after' => $result['after']],
 			);
 		} catch (\Throwable $e) {
-			$this->logger->warning('Background Changer refresh failed: {reason}', [
+			$this->logger->warning('ImageChanger refresh failed: {reason}', [
 				'app' => 'backgroundchanger',
 				'reason' => $e->getMessage(),
 			]);

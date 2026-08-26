@@ -98,7 +98,7 @@ $info = new DOMDocument();
 expect($info->load(__DIR__ . '/../appinfo/info.xml'), 'info.xml must parse');
 $xpath = new DOMXPath($info);
 expect($xpath->evaluate('string(/info/id)') === 'backgroundchanger', 'Independent app identifier');
-expect($xpath->evaluate('string(/info/name)') === 'Background Changer', 'International app name');
+expect($xpath->evaluate('string(/info/name)') === 'ImageChanger', 'International app name');
 expect($xpath->evaluate('string(/info/namespace)') === 'BackgroundChanger', 'Independent namespace');
 expect($xpath->evaluate('string(/info/author)') === 'chrissi0285', 'Public author identity');
 expect($xpath->evaluate('string(/info/version)') === '1.0.0', 'New app starts with a new release line');
@@ -131,10 +131,14 @@ $script = file_get_contents(__DIR__ . '/../js/background.js');
 expect(is_string($script) && str_contains($script, 'designed by chrissi0285'), 'Exact visible design line');
 expect(is_string($script)
 	&& str_contains($script, "document.addEventListener('click'")
-	&& str_contains($script, 'event.defaultPrevented && routeRevision === revision')
+	&& str_contains($script, "[role=\"link\"], [role=\"tab\"]")
+	&& str_contains($script, '.app-navigation-entry-link')
+	&& str_contains($script, '(!anchor || event.defaultPrevented) && routeRevision === revision')
+	&& str_contains($script, "window.navigation?.addEventListener('currententrychange'")
+	&& str_contains($script, 'window.location.href !== observedHref')
 	&& str_contains($script, "window.addEventListener('popstate', routeChanged)")
 	&& str_contains($script, "window.addEventListener('hashchange', routeChanged)"),
-	'Link, router and browser-history navigation share the rotation lifecycle');
+	'Links, semantic non-link routers and browser history share the rotation lifecycle');
 $settingsScript = file_get_contents(__DIR__ . '/../js/settings.js');
 expect(is_string($settingsScript)
 	&& str_contains($settingsScript, "/apps/backgroundchanger/api/theme")
@@ -160,7 +164,7 @@ expect($themeRoutes === [[
 ]], 'Exactly one POST-only app-owned theme route');
 $refresh = file_get_contents(__DIR__ . '/../lib/Service/RefreshService.php');
 expect(is_string($refresh)
-	&& str_contains($refresh, "logger->debug('Background Changer rejected a Commons candidate"),
+	&& str_contains($refresh, "logger->debug('ImageChanger rejected a Commons candidate"),
 	'Expected provider candidate rejections stay below the Nextcloud warning level');
 
 fwrite(STDOUT, sprintf("%d unit checks passed.\n", $tests));

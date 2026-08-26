@@ -26,7 +26,7 @@ final class ThemeSettings implements IDeclarativeSettingsForm {
 			'section_type' => DeclarativeSettingsTypes::SECTION_TYPE_PERSONAL,
 			'section_id' => 'theming',
 			'storage_type' => DeclarativeSettingsTypes::STORAGE_TYPE_INTERNAL,
-			'title' => $this->l->t('Background Changer'),
+			'title' => $this->l->t('ImageChanger'),
 			'description' => $this->l->t('Choose rotating backgrounds served locally by this Nextcloud.'),
 			'fields' => [
 				[

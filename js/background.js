@@ -24,6 +24,7 @@
 	let rotationTimer = null
 	let linkNavigationTimer = null
 	let routeRevision = 0
+	let observedHref = window.location.href
 	let pageShown = false
 
 	function sameOriginUrl(value) {
@@ -203,7 +204,7 @@
 			document.documentElement.dataset.backgroundchangerReady = background.id
 		} catch (error) {
 			if (error?.name !== 'AbortError' && !controller.signal.aborted) {
-				console.debug('Background Changer: local background unavailable')
+				console.debug('ImageChanger: local background unavailable')
 			}
 		} finally {
 			window.clearTimeout(timeout)
@@ -224,6 +225,7 @@
 	}
 
 	function routeChanged() {
+		observedHref = window.location.href
 		routeRevision++
 		if (linkNavigationTimer !== null) {
 			window.clearTimeout(linkNavigationTimer)
@@ -236,10 +238,16 @@
 		if (!pageShown || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
 			return
 		}
-		const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null
+		const element = event.target instanceof Element ? event.target : null
+		const anchor = element?.closest('a[href]') || null
+		const control = anchor || element?.closest(
+			'[role="link"], [role="tab"], [role="menuitem"][aria-current], '
+			+ '[role="menuitem"][aria-selected], .app-navigation-entry-link',
+		) || null
 		const target = anchor?.getAttribute('target')?.toLowerCase() || ''
-		if (!anchor || anchor.hasAttribute('download') || (target !== '' && target !== '_self')
-			|| anchor.getAttribute('aria-disabled') === 'true' || !sameOriginUrl(anchor.href)) {
+		if (!control || control.hasAttribute('disabled') || control.getAttribute('aria-disabled') === 'true'
+			|| (anchor && (anchor.hasAttribute('download') || (target !== '' && target !== '_self')
+				|| !sameOriginUrl(anchor.href)))) {
 			return
 		}
 
@@ -249,11 +257,17 @@
 		}
 		linkNavigationTimer = window.setTimeout(() => {
 			linkNavigationTimer = null
-			if (event.defaultPrevented && routeRevision === revision) {
+			if ((!anchor || event.defaultPrevented) && routeRevision === revision) {
 				scheduleRotation()
 			}
 		}, NAVIGATION_GRACE_MS)
 	}, true)
+
+	window.navigation?.addEventListener('currententrychange', () => {
+		if (pageShown && window.location.href !== observedHref) {
+			routeChanged()
+		}
+	})
 
 	for (const method of ['pushState', 'replaceState']) {
 		const original = window.history[method]

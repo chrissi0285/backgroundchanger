@@ -318,7 +318,7 @@ async function dismissOnboarding() {
 async function themeControl(value = '') {
 	return evaluate(`(async () => {
 		const section = [...document.querySelectorAll('.declarative-settings-section')]
-			.find(candidate => candidate.textContent?.includes('Background Changer'))
+			.find(candidate => candidate.textContent?.includes('ImageChanger'))
 		if (!section) return null
 		section.scrollIntoView({ block: 'center', inline: 'nearest' })
 		await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
@@ -609,11 +609,11 @@ if (mode === 'navigation-full') {
 	assert(personal.metaCount === 0, 'A personal Nextcloud background must suppress the endpoint')
 	assert(personal.creditText === '', 'A personal Nextcloud background must suppress app attribution')
 	assert(!personal.background.includes('/apps/backgroundchanger/'),
-		'A personal Nextcloud background must suppress Background Changer CSS')
+		'A personal Nextcloud background must suppress ImageChanger CSS')
 	assert(selectionCount() === selectionsBeforePersonal,
-		'A personal Nextcloud background must suppress Background Changer selections')
+		'A personal Nextcloud background must suppress ImageChanger selections')
 	assert(imageCount() === imagesBeforePersonal,
-		'A personal Nextcloud background must suppress Background Changer images')
+		'A personal Nextcloud background must suppress ImageChanger images')
 	const personalResult = {
 		backgroundLabel: personalTarget.ariaLabel,
 		metaCount: personal.metaCount,
@@ -644,8 +644,10 @@ if (mode === 'lifecycle' || mode === 'lifecycle-local') {
 	await command('Page.addScriptToEvaluateOnNewDocument', {
 		source: `(() => {
 			const nativeSetInterval = window.setInterval.bind(window)
+			const nativePushState = window.history.pushState
 			window.__backgroundchangerIntervalDelays = []
 			window.__backgroundchangerRunInterval = null
+			window.__backgroundchangerNativePushState = (...args) => Reflect.apply(nativePushState, window.history, args)
 			window.setInterval = (handler, delay, ...args) => {
 				if (delay === ${ROTATION_INTERVAL_MS}) {
 					window.__backgroundchangerIntervalDelays.push(delay)
@@ -698,8 +700,32 @@ if (mode === 'lifecycle' || mode === 'lifecycle-local') {
 	const replaceId = await changesFrom(beforeReplace)
 	stages.push({ name: 'replaceState', ...requestCounts() })
 
+	const nonLinkTarget = await evaluate(`(async () => {
+		const button = document.createElement('button')
+		button.type = 'button'
+		button.setAttribute('role', 'tab')
+		button.textContent = 'Internal test view'
+		button.style.cssText = 'position:fixed;left:24px;top:80px;z-index:100000;padding:12px'
+		button.addEventListener('click', () => {
+			window.__backgroundchangerNativePushState({}, '', '/login?backgroundchanger-lifecycle=non-link')
+		})
+		document.body.appendChild(button)
+		await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+		const bounds = button.getBoundingClientRect()
+		const x = bounds.left + bounds.width / 2
+		const y = bounds.top + bounds.height / 2
+		const hit = document.elementFromPoint(x, y)
+		return hit === button ? { x, y } : null
+	})()`)
+	assert(nonLinkTarget, 'The semantic non-link route control must be a real mouse target')
+	const beforeNonLink = replaceId || beforeReplace
+	await realClick(nonLinkTarget)
+	await waitFor(`location.search === '?backgroundchanger-lifecycle=non-link'`)
+	const nonLinkId = await changesFrom(beforeNonLink)
+	stages.push({ name: 'non-link-router', ...requestCounts() })
+
 	const reloadIds = []
-	let previous = replaceId || beforeReplace
+	let previous = nonLinkId || beforeNonLink
 	for (let reload = 1; reload <= 4; reload++) {
 		await command('Page.reload', { ignoreCache: false })
 		await waitFor(`document.readyState === 'complete'`)
@@ -721,6 +747,7 @@ if (mode === 'lifecycle' || mode === 'lifecycle-local') {
 		intervalChangedTo: intervalId,
 		pushStateChangedTo: pushId,
 		replaceStateChangedTo: replaceId,
+		nonLinkRouterChangedTo: nonLinkId,
 		reloadIds,
 		stages,
 		providerRequests: providerHosts.length,
@@ -731,6 +758,7 @@ if (mode === 'lifecycle' || mode === 'lifecycle-local') {
 	assert(intervalId !== '', 'Scheduled rotation did not change the background')
 	assert(pushId !== '', 'history.pushState did not change the background')
 	assert(replaceId !== '', 'history.replaceState did not change the background')
+	assert(nonLinkId !== '', 'Semantic non-link router navigation did not change the background')
 	for (let stage = 0; stage < stages.length; stage++) {
 		assert(stages[stage].selections === stage + 1,
 			`${stages[stage].name} must produce exactly one local selection`)
@@ -753,7 +781,7 @@ if (mode === 'settings' || mode === 'settings-inspect') {
 	await waitForBackground()
 	await submitLogin()
 	await navigate(`${nextcloudBase}/index.php/settings/user/theming`)
-	await waitFor(`document.body?.innerText.includes('Background Changer')`, 30_000)
+	await waitFor(`document.body?.innerText.includes('ImageChanger')`, 30_000)
 	await dismissOnboarding()
 	await waitFor(`!document.querySelector('[role="dialog"]')`)
 
@@ -766,14 +794,14 @@ if (mode === 'settings' || mode === 'settings-inspect') {
 			.filter(input => expected.includes(input.value))
 		const visibleText = document.body.innerText
 		return {
-			titleVisible: visibleText.includes('Background Changer'),
+			titleVisible: visibleText.includes('ImageChanger'),
 			descriptionVisible: visibleText.includes('Choose rotating backgrounds served locally by this Nextcloud.'),
 			values: radios.map(input => input.value),
 			visibleLabels: expectedLabels.filter(label => visibleText.includes(label)),
 		}
 	})()`)
-	assert(settings.titleVisible, 'Background Changer settings title must be visible')
-	assert(settings.descriptionVisible, 'Background Changer settings description must be visible')
+	assert(settings.titleVisible, 'ImageChanger settings title must be visible')
+	assert(settings.descriptionVisible, 'ImageChanger settings description must be visible')
 	assert(expectedValues.every(value => settings.values.includes(value)), 'All six theme choices must be rendered as radio controls')
 	assert(expectedLabels.every(label => settings.visibleLabels.includes(label)), 'Every theme choice must have a visible label')
 	if (mode === 'settings-inspect') {
@@ -867,7 +895,7 @@ if (mode === 'settings' || mode === 'settings-inspect') {
 			&& themeRequests[writesBefore]?.payload?.theme === value,
 			`${value} must use the CSRF-protected app-owned theme contract`)
 		await waitFor(`document.readyState === 'complete'`)
-		await waitFor(`document.body?.innerText.includes('Background Changer')`, 30_000)
+		await waitFor(`document.body?.innerText.includes('ImageChanger')`, 30_000)
 		await waitFor(`[...document.querySelectorAll('input[type="radio"]')].some(input => input.value === ${JSON.stringify(value)} && input.checked)`, 10_000)
 		if (value === 'off') {
 			await sleep(500)
@@ -877,7 +905,7 @@ if (mode === 'settings' || mode === 'settings-inspect') {
 		assert(await evaluate(`!document.querySelector('[role="dialog"]')`), 'No onboarding dialog may cover a theme screenshot')
 		const visibleControl = await themeControl(value)
 		assert(visibleControl?.carrier === 'checkbox-radio-switch__content',
-			'The selected Background Changer radio must be visible through its real NC34 click carrier')
+			'The selected ImageChanger radio must be visible through its real NC34 click carrier')
 		assert(await evaluate(`(() => {
 			const input = [...document.querySelectorAll('.declarative-settings-section input[type="radio"]')]
 				.find(candidate => candidate.value === ${JSON.stringify(value)})
@@ -885,7 +913,7 @@ if (mode === 'settings' || mode === 'settings-inspect') {
 			const section = input.closest('.declarative-settings-section')
 			const bounds = section?.getBoundingClientRect()
 			return Boolean(bounds && bounds.top >= 0 && bounds.bottom <= innerHeight)
-		})()`), 'The complete Background Changer section and selected radio must be inside the screenshot viewport')
+		})()`), 'The complete ImageChanger section and selected radio must be inside the screenshot viewport')
 		const state = await snapshot()
 		const effectiveTheme = value === 'default' ? 'landscapes' : value
 		if (value === 'off') {
@@ -1005,14 +1033,14 @@ if (mode === 'settings' || mode === 'settings-inspect') {
 	await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
 	const personal = await snapshot()
 	await screenshot('nextcloud-personal-background')
-	assert(personal.metaCount === 0, 'A personal Nextcloud background must suppress the Background Changer endpoint')
-	assert(personal.creditText === '', 'A personal Nextcloud background must suppress Background Changer attribution')
+	assert(personal.metaCount === 0, 'A personal Nextcloud background must suppress the ImageChanger endpoint')
+	assert(personal.creditText === '', 'A personal Nextcloud background must suppress ImageChanger attribution')
 	assert(!personal.background.includes('/apps/backgroundchanger/'),
-		'A personal Nextcloud background must suppress Background Changer CSS')
+		'A personal Nextcloud background must suppress ImageChanger CSS')
 	assert(requests.filter(url => url.includes('/apps/backgroundchanger/api/background')).length === selectionsBeforePersonalPage,
-		'A personal Nextcloud background must suppress local Background Changer selections')
+		'A personal Nextcloud background must suppress local ImageChanger selections')
 	assert(requests.filter(url => url.includes('/apps/backgroundchanger/api/image/')).length === imagesBeforePersonalPage,
-		'A personal Nextcloud background must suppress local Background Changer images')
+		'A personal Nextcloud background must suppress local ImageChanger images')
 
 	const appThemeWrites = requests.filter(url => url.includes('/apps/backgroundchanger/api/theme'))
 	const appThemeResponses = responses.filter(response => response.url.includes('/apps/backgroundchanger/api/theme'))
@@ -1061,11 +1089,11 @@ if (mode === 'personal') {
 	await screenshot('files-personal-background')
 	const selectionRequests = requests.filter(url => url.includes('/apps/backgroundchanger/api/background'))
 	const imageRequests = requests.filter(url => url.includes('/apps/backgroundchanger/api/image/'))
-	assert(personal.metaCount === 0, 'Personal background must suppress the Background Changer endpoint')
-	assert(personal.creditText === '', 'Personal background must suppress Background Changer attribution')
-	assert(!personal.background.includes('/apps/backgroundchanger/'), 'Personal background must not use Background Changer CSS')
-	assert(selectionRequests.length === 0, 'Personal background must not request a Background Changer selection')
-	assert(imageRequests.length === 0, 'Personal background must not request a Background Changer image')
+	assert(personal.metaCount === 0, 'Personal background must suppress the ImageChanger endpoint')
+	assert(personal.creditText === '', 'Personal background must suppress ImageChanger attribution')
+	assert(!personal.background.includes('/apps/backgroundchanger/'), 'Personal background must not use ImageChanger CSS')
+	assert(selectionRequests.length === 0, 'Personal background must not request an ImageChanger selection')
+	assert(imageRequests.length === 0, 'Personal background must not request an ImageChanger image')
 	console.log(JSON.stringify({ personal, selectionRequests: 0, imageRequests: 0 }, null, 2))
 	socket.close()
 	process.exit(0)
@@ -1100,7 +1128,7 @@ if (mode === 'guest') {
 	assert(pages.every(page => page.creditText.length > 0), 'Each login page must show attribution')
 	assert(pages.every(page => page.creditText.includes('designed by chrissi0285')), 'Each login page must show the exact design line')
 	assert(pages.every(page => page.readyId === page.id), 'Each login page must expose only a decoded background as ready')
-	assert(pages.every(page => page.bodyBackground.includes('backgroundchanger')), 'Each login page must use a local Background Changer image')
+	assert(pages.every(page => page.bodyBackground.includes('backgroundchanger')), 'Each login page must use a local ImageChanger image')
 	assert(new Set(pages.map(page => page.id)).size === pages.length, 'Consecutive login pages must use different images')
 	assert(new Set(pages.map(page => page.backgroundCropHash)).size === pages.length, 'Consecutive login pages must paint different large background areas')
 	assert(selectionRequests.length === pages.length, `Each login page must request exactly one local selection, got ${selectionRequests.length}`)
@@ -1193,7 +1221,7 @@ if (captureAuthenticatedPages) {
 assert(login.metaCount === 1, 'Login page must contain exactly one endpoint meta tag')
 assert(login.creditText.length > 0, 'Login page must show attribution')
 assert(login.creditText.includes('designed by chrissi0285'), 'Login page must show the exact design line')
-assert(login.bodyBackground.includes('backgroundchanger'), 'Login page must use a local Background Changer image')
+assert(login.bodyBackground.includes('backgroundchanger'), 'Login page must use a local ImageChanger image')
 
 await submitLogin()
 await waitForBackground()

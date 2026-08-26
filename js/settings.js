@@ -22,12 +22,12 @@
 		if (values.size !== themes.size || ![...themes].every(theme => values.has(theme))) {
 			return null
 		}
-		return section.textContent?.includes('Background Changer') ? field : null
+		return section.textContent?.includes('ImageChanger') ? field : null
 	}
 
 	function notifyFailure() {
 		if (window.OC?.Notification?.showTemporary) {
-			window.OC.Notification.showTemporary('Background Changer could not save the theme.')
+			window.OC.Notification.showTemporary('ImageChanger could not save the theme.')
 		}
 	}
 

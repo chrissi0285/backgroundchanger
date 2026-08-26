@@ -31,12 +31,12 @@ final class Refresh extends Command {
 		try {
 			$result = $this->refreshService->refresh();
 		} catch (\Throwable $e) {
-			$output->writeln('<error>Background Changer refresh failed: ' . $e->getMessage() . '</error>');
+			$output->writeln('<error>ImageChanger refresh failed: ' . $e->getMessage() . '</error>');
 			return Command::FAILURE;
 		}
 
 		$output->writeln(sprintf(
-			'Background Changer cache: %d before, %d added, %d rejected, %d after.',
+			'ImageChanger cache: %d before, %d added, %d rejected, %d after.',
 			$result['before'],
 			$result['added'],
 			$result['rejected'],

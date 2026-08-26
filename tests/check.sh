@@ -33,10 +33,16 @@ if grep -R -n -E 'SPDX-FileCopyrightText: 2026 (Christian|Chrissi)|<author[^>]*>
 fi
 
 grep -q '<id>backgroundchanger</id>' appinfo/info.xml
+grep -q '<name>ImageChanger</name>' appinfo/info.xml
 grep -q '<namespace>BackgroundChanger</namespace>' appinfo/info.xml
 grep -q '<author homepage="https://github.com/chrissi0285">chrissi0285</author>' appinfo/info.xml
 grep -q 'Source-SHA256: 867c66e8d84bc2ee279fa2a85a6a4659160db9091c6a18ae01566aa7de2a3e99' img/app.svg
 grep -q 'designed by chrissi0285' js/background.js
+
+if grep -R -n -F 'Background Changer' appinfo css img js lib README.md CHANGELOG.md; then
+	printf '%s\n' 'The retired visible product name remains in public files.' >&2
+	exit 1
+fi
 
 if find . -path './.git' -prune -o -name 'signature.json' -print | grep -q .; then
 	printf '%s\n' 'An unsigned development tree must not carry a foreign signature.' >&2

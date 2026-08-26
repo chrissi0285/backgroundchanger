@@ -16,7 +16,7 @@ use OCP\Http\Client\IResponse;
 
 final class CommonsService {
 	private const API_URL = 'https://commons.wikimedia.org/w/api.php';
-	private const USER_AGENT = 'BackgroundChanger/1.0 (+https://github.com/chrissi0285/backgroundchanger)';
+	private const USER_AGENT = 'ImageChanger/1.0 (+https://github.com/chrissi0285/backgroundchanger)';
 	private const MAX_API_BYTES = 1_000_000;
 	private const MAX_IMAGE_BYTES = 12_000_000;
 	private const MIN_IMAGE_BYTES = 32_000;

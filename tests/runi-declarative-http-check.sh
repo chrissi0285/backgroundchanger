@@ -34,7 +34,7 @@ if nc user:info "$uid" >/dev/null 2>&1; then
 fi
 
 password=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9_-' | head -c 48)
-OC_PASS=$password nc user:add --password-from-env --display-name 'Background Changer contract test' "$uid" >/dev/null
+OC_PASS=$password nc user:add --password-from-env --display-name 'ImageChanger contract test' "$uid" >/dev/null
 
 request() {
 	local role=$1

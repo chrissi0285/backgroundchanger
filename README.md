@@ -1,12 +1,12 @@
-# Background Changer
+# ImageChanger
 
-Background Changer shows rotating Wikimedia Commons backgrounds on Nextcloud
-34. It rotates on page loads, same-origin link clicks, internal router changes,
-browser Back/Forward and every five minutes while the page is visible. Clicking
-an already active Nextcloud route also selects a new background. Images are
-validated and served from small local caches; the browser never contacts an
-image provider. Cached images remain available when the server is temporarily
-offline.
+ImageChanger shows rotating Wikimedia Commons backgrounds on Nextcloud
+34. It rotates on page loads, same-origin link clicks, internal router changes
+(including semantic non-link menu controls), browser Back/Forward and every
+five minutes while the page is visible. Clicking an already active Nextcloud
+route also selects a new background. Images are validated and served from
+small local caches; the browser never contacts an image provider. Cached images
+remain available when the server is temporarily offline.
 
 ## Themes
 
@@ -44,7 +44,7 @@ author and copyright metadata use `chrissi0285` exclusively.
 
 This AGPL-3.0-or-later project is a cleanly renamed successor to
 [`nextcloud/unsplash`](https://github.com/nextcloud/unsplash). Git history keeps
-the upstream authorship. Background Changer uses its own identifier and will
+the upstream authorship. ImageChanger uses its own identifier and will
 only be distributed with a certificate issued specifically for
 `backgroundchanger`; no upstream or predecessor signing material is reused.
 
