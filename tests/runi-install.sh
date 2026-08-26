@@ -20,6 +20,12 @@ if [[ ! $db_password =~ ^[A-Za-z0-9_-]{20,128}$
 	printf '%s\n' 'Provide random test passwords through BACKGROUNDCHANGER_DB_PASSWORD and BACKGROUNDCHANGER_ADMIN_PASSWORD.' >&2
 	exit 2
 fi
+for extension in apcu redis; do
+	if ! php -m | grep -Fqx "$extension"; then
+		printf 'Required PHP extension is missing: %s\n' "$extension" >&2
+		exit 2
+	fi
+done
 if [[ -e /var/www/nextcloud || ! -f $archive ]]; then
 	printf '%s\n' 'Nextcloud target is not empty or the verified archive is missing.' >&2
 	exit 2

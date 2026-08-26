@@ -36,6 +36,9 @@ final class BeforeTemplateRenderedEventListener implements IEventListener {
 			&& !$event instanceof BeforeLoginTemplateRenderedEvent) {
 			return;
 		}
+		if ($event instanceof BeforeTemplateRenderedEvent && $event->isLoggedIn()) {
+			Util::addScript(Application::APP_ID, 'settings');
+		}
 
 		if ($event instanceof BeforeTemplateRenderedEvent
 			&& $event->isLoggedIn()

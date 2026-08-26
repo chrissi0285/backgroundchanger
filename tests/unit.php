@@ -129,5 +129,32 @@ $svg = file_get_contents(__DIR__ . '/../img/app.svg');
 expect(is_string($svg) && str_contains($svg, '867c66e8d84bc2ee279fa2a85a6a4659160db9091c6a18ae01566aa7de2a3e99'), 'Central symbol provenance');
 $script = file_get_contents(__DIR__ . '/../js/background.js');
 expect(is_string($script) && str_contains($script, 'designed by chrissi0285'), 'Exact visible design line');
+$settingsScript = file_get_contents(__DIR__ . '/../js/settings.js');
+expect(is_string($settingsScript)
+	&& str_contains($settingsScript, "/apps/backgroundchanger/api/theme")
+	&& str_contains($settingsScript, 'requesttoken: window.OC.requestToken')
+	&& str_contains($settingsScript, "target.closest('.checkbox-radio-switch')?.querySelector('input[type=\"radio\"]')")
+	&& !str_contains($settingsScript, '/settings/api/declarative/value'),
+	'NC34 visible radio clicks use only the CSRF-protected app-owned route');
+$settingsController = file_get_contents(__DIR__ . '/../lib/Controller/SettingsController.php');
+expect(is_string($settingsController)
+	&& str_contains($settingsController, '#[NoAdminRequired]')
+	&& str_contains($settingsController, '@NoAdminRequired')
+	&& !str_contains($settingsController, 'NoCSRFRequired'),
+	'App-owned theme writes retain login, admin-compatibility and CSRF protection');
+$routes = require __DIR__ . '/../appinfo/routes.php';
+$themeRoutes = array_values(array_filter(
+	$routes['routes'] ?? [],
+	static fn (array $route): bool => ($route['name'] ?? '') === 'settings#setTheme',
+));
+expect($themeRoutes === [[
+	'name' => 'settings#setTheme',
+	'url' => '/api/theme',
+	'verb' => 'POST',
+]], 'Exactly one POST-only app-owned theme route');
+$refresh = file_get_contents(__DIR__ . '/../lib/Service/RefreshService.php');
+expect(is_string($refresh)
+	&& str_contains($refresh, "logger->debug('Background Changer rejected a Commons candidate"),
+	'Expected provider candidate rejections stay below the Nextcloud warning level');
 
 fwrite(STDOUT, sprintf("%d unit checks passed.\n", $tests));

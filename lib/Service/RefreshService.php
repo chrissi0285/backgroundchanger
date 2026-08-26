@@ -83,7 +83,7 @@ final class RefreshService {
 				}
 			} catch (\Throwable $e) {
 				$rejected++;
-				$this->logger->warning('Background Changer rejected a Commons candidate for {theme}: {reason}', [
+				$this->logger->debug('Background Changer rejected a Commons candidate for {theme}: {reason}', [
 					'app' => 'backgroundchanger',
 					'theme' => $theme,
 					'reason' => $e->getMessage(),

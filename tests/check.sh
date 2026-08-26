@@ -16,8 +16,10 @@ php tests/unit.php
 # tests/cache.php needs the real Nextcloud 34 interfaces and is run by the
 # isolated integration harness after loading Nextcloud's bootstrap.
 node --check js/background.js
+node --check js/settings.js
 node --check tests/browser-test.mjs
 bash -n tests/runi-install.sh
+bash -n tests/runi-declarative-http-check.sh
 xmllint --noout appinfo/info.xml
 
 if grep -R -n -E 'OCA\\(Unsplash|Wechselbild)|<id>(unsplash|wechselbild)</id>|apps/(unsplash|wechselbild)' appinfo css img js lib; then

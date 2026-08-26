@@ -6,7 +6,7 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
-const [, , debuggerBase, nextcloudBase, usernameArgument, passwordArgument, outputDirectory, mode = 'normal'] = process.argv
+const [, , debuggerBase, nextcloudBase, usernameArgument, passwordArgument, outputDirectory, mode = 'normal', expectedTheme = ''] = process.argv
 const username = usernameArgument === '@env' ? process.env.BACKGROUNDCHANGER_TEST_USERNAME : usernameArgument
 const password = passwordArgument === '@env' ? process.env.BACKGROUNDCHANGER_TEST_PASSWORD : passwordArgument
 const captureAuthenticatedPages = mode !== 'authenticated'
@@ -32,6 +32,8 @@ await new Promise((resolve, reject) => {
 let sequence = 0
 const pending = new Map()
 const requests = []
+const responses = []
+const themeRequests = []
 const exceptions = []
 
 socket.addEventListener('message', event => {
@@ -48,6 +50,33 @@ socket.addEventListener('message', event => {
 	}
 	if (message.method === 'Network.requestWillBeSent') {
 		requests.push(message.params.request.url)
+		if (message.params.request.url.includes('/apps/backgroundchanger/api/theme')) {
+			const headerNames = Object.keys(message.params.request.headers).map(name => name.toLowerCase())
+			let payload = null
+			try {
+				const parsed = JSON.parse(message.params.request.postData || '')
+				payload = {
+					theme: parsed.theme,
+				}
+			} catch (error) {
+				payload = null
+			}
+			themeRequests.push({
+				requestId: message.params.requestId,
+				method: message.params.request.method,
+				hasRequestToken: headerNames.includes('requesttoken'),
+				payload,
+			})
+		}
+	}
+	if (message.method === 'Network.responseReceived') {
+		const headerNames = Object.keys(message.params.response.headers).map(name => name.toLowerCase())
+		responses.push({
+			requestId: message.params.requestId,
+			url: message.params.response.url,
+			status: message.params.response.status,
+			authNotConfirmed: headerNames.includes('x-nc-auth-notconfirmed'),
+		})
 	}
 	if (message.method === 'Runtime.exceptionThrown') {
 		exceptions.push(message.params.exceptionDetails.text)
@@ -77,8 +106,14 @@ async function evaluate(expression) {
 async function waitFor(expression, timeout = 20_000) {
 	const deadline = Date.now() + timeout
 	while (Date.now() < deadline) {
-		if (await evaluate(`Boolean(${expression})`)) {
-			return
+		try {
+			if (await evaluate(`Boolean(${expression})`)) {
+				return
+			}
+		} catch (error) {
+			if (!/context|Inspected target navigated or closed/i.test(error.message)) {
+				throw error
+			}
 		}
 		await sleep(200)
 	}
@@ -114,20 +149,138 @@ async function waitForBackground() {
 
 async function dismissOnboarding() {
 	for (let attempt = 0; attempt < 40; attempt++) {
-		const clicked = await evaluate(`(() => {
+		const target = await evaluate(`(() => {
 			const dialog = document.querySelector('[role="dialog"]')
-			const close = dialog?.querySelector('button[aria-label="Schließen"], button[aria-label="Close"]')
-			if (!close) return false
-			close.click()
-			return true
+			const close = dialog && [...dialog.querySelectorAll('button')].find(button => {
+				const label = (button.getAttribute('aria-label') || '').trim()
+				const text = (button.textContent || '').trim()
+				if (!(['Schließen', 'Close', 'Überspringen', 'Skip'].includes(label)
+					|| ['Überspringen', 'Skip'].includes(text))) return false
+				const bounds = button.getBoundingClientRect()
+				if (bounds.width <= 0 || bounds.height <= 0 || bounds.left < 0 || bounds.top < 0
+					|| bounds.right > innerWidth || bounds.bottom > innerHeight) return false
+				const hit = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)
+				return hit === button || button.contains(hit)
+			})
+			if (!close) return null
+			const bounds = close.getBoundingClientRect()
+			if (bounds.width <= 0 || bounds.height <= 0) return null
+			return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }
 		})()`)
-		if (clicked) {
-			await waitFor(`!document.querySelector('[role="dialog"]')`)
-			return true
+		if (target) {
+			await command('Input.dispatchMouseEvent', {
+				type: 'mouseMoved',
+				x: target.x,
+				y: target.y,
+			})
+			await command('Input.dispatchMouseEvent', {
+				type: 'mousePressed',
+				x: target.x,
+				y: target.y,
+				button: 'left',
+				buttons: 1,
+				clickCount: 1,
+			})
+			await sleep(50)
+			await command('Input.dispatchMouseEvent', {
+				type: 'mouseReleased',
+				x: target.x,
+				y: target.y,
+				button: 'left',
+				buttons: 0,
+				clickCount: 1,
+			})
+			await sleep(500)
+			if (await evaluate(`!document.querySelector('[role="dialog"]')`)) {
+				return true
+			}
 		}
 		await sleep(250)
 	}
 	return false
+}
+
+async function themeControl(value = '') {
+	return evaluate(`(async () => {
+		const section = [...document.querySelectorAll('.declarative-settings-section')]
+			.find(candidate => candidate.textContent?.includes('Background Changer'))
+		if (!section) return null
+		section.scrollIntoView({ block: 'center', inline: 'nearest' })
+		await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+		if (${JSON.stringify(value)} === '') {
+			const bounds = section.getBoundingClientRect()
+			return { visible: bounds.top >= 0 && bounds.bottom <= innerHeight }
+		}
+		const input = [...section.querySelectorAll('input[type="radio"]')]
+			.find(candidate => candidate.value === ${JSON.stringify(value)})
+		if (!input) return null
+		const content = input.closest('.checkbox-radio-switch')?.querySelector('.checkbox-radio-switch__content')
+		if (!content) return null
+		const bounds = content.getBoundingClientRect()
+		if (bounds.width <= 0 || bounds.height <= 0) return null
+		const x = bounds.left + bounds.width / 2
+		const y = bounds.top + bounds.height / 2
+		const hit = document.elementFromPoint(x, y)
+		if (!(hit === content || content.contains(hit))) return null
+		return { x, y, carrier: 'checkbox-radio-switch__content' }
+	})()`)
+}
+
+async function personalBackgroundControl() {
+	return evaluate(`(async () => {
+		const section = document.querySelector('.settings-section.background')
+		if (!section) return null
+		const button = [...section.querySelectorAll('button[aria-label]')]
+			.find(candidate => candidate.getAttribute('aria-pressed') !== 'true'
+				&& getComputedStyle(candidate).backgroundImage.includes('/apps/theming/img/background/preview/'))
+		if (!button) return null
+		button.scrollIntoView({ block: 'center', inline: 'nearest' })
+		await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+		const bounds = button.getBoundingClientRect()
+		if (bounds.width <= 0 || bounds.height <= 0) return null
+		const x = bounds.left + bounds.width / 2
+		const y = bounds.top + bounds.height / 2
+		const hit = document.elementFromPoint(x, y)
+		if (!(hit === button || button.contains(hit))) return null
+		return { x, y, ariaLabel: button.getAttribute('aria-label') || '' }
+	})()`)
+}
+
+async function submitLogin() {
+	await evaluate(`(() => {
+		const user = document.querySelector('input[name="user"]')
+		const pass = document.querySelector('input[name="password"]')
+		if (!user || !pass) return false
+		user.value = ${JSON.stringify(username)}
+		pass.value = ${JSON.stringify(password)}
+		user.dispatchEvent(new Event('input', { bubbles: true }))
+		pass.dispatchEvent(new Event('input', { bubbles: true }))
+		const remember = document.querySelector('input[name="remember_login"]')
+		if (remember) {
+			remember.checked = false
+			remember.dispatchEvent(new Event('change', { bubbles: true }))
+		}
+		document.querySelector('form')?.requestSubmit()
+		return true
+	})()`)
+	await waitFor(`location.pathname !== '/login'`, 30_000)
+	await waitFor(`document.readyState === 'complete'`)
+}
+
+async function logout() {
+	const logoutUrl = await evaluate(`(() => {
+		if (typeof window.OC?.generateUrl !== 'function' || typeof window.OC?.requestToken !== 'string') {
+			return ''
+		}
+		const url = new URL(window.OC.generateUrl('/logout'), location.origin)
+		url.searchParams.set('requesttoken', window.OC.requestToken)
+		return url.href
+	})()`)
+	const parsedLogoutUrl = new URL(logoutUrl)
+	assert(parsedLogoutUrl.origin === new URL(nextcloudBase).origin
+		&& parsedLogoutUrl.pathname.endsWith('/logout'), 'Nextcloud logout URL must stay on the tested origin')
+	await navigate(logoutUrl)
+	await waitFor(`document.querySelector('input[name="user"]') && document.querySelector('input[name="password"]')`)
 }
 
 async function snapshot() {
@@ -283,6 +436,313 @@ if (mode === 'lifecycle' || mode === 'lifecycle-local') {
 	process.exit(0)
 }
 
+if (mode === 'settings' || mode === 'settings-inspect') {
+	await navigate(`${nextcloudBase}/login`)
+	await waitFor(`document.querySelector('input[name="user"]') && document.querySelector('input[name="password"]')`)
+	await waitForBackground()
+	await submitLogin()
+	await navigate(`${nextcloudBase}/index.php/settings/user/theming`)
+	await waitFor(`document.body?.innerText.includes('Background Changer')`, 30_000)
+	await dismissOnboarding()
+	await waitFor(`!document.querySelector('[role="dialog"]')`)
+
+	const expectedValues = ['default', 'off', 'landscapes', 'animals', 'space', 'architecture']
+	const expectedLabels = ['Default', 'Off', 'Landscapes', 'Animals', 'Space', 'Architecture']
+	const settings = await evaluate(`(() => {
+		const expected = ${JSON.stringify(['default', 'off', 'landscapes', 'animals', 'space', 'architecture'])}
+		const expectedLabels = ${JSON.stringify(['Default', 'Off', 'Landscapes', 'Animals', 'Space', 'Architecture'])}
+		const radios = [...document.querySelectorAll('input[type="radio"]')]
+			.filter(input => expected.includes(input.value))
+		const visibleText = document.body.innerText
+		return {
+			titleVisible: visibleText.includes('Background Changer'),
+			descriptionVisible: visibleText.includes('Choose rotating backgrounds served locally by this Nextcloud.'),
+			values: radios.map(input => input.value),
+			visibleLabels: expectedLabels.filter(label => visibleText.includes(label)),
+		}
+	})()`)
+	assert(settings.titleVisible, 'Background Changer settings title must be visible')
+	assert(settings.descriptionVisible, 'Background Changer settings description must be visible')
+	assert(expectedValues.every(value => settings.values.includes(value)), 'All six theme choices must be rendered as radio controls')
+	assert(expectedLabels.every(label => settings.visibleLabels.includes(label)), 'Every theme choice must have a visible label')
+	if (mode === 'settings-inspect') {
+		const controls = await evaluate(`(() => {
+			const expected = ${JSON.stringify(['default', 'off', 'landscapes', 'animals', 'space', 'architecture'])}
+			return [...document.querySelectorAll('input[type="radio"]')]
+				.filter(input => expected.includes(input.value))
+				.map(input => ({
+					value: input.value,
+					name: input.name,
+					id: input.id,
+					ancestors: [...function* () {
+						let node = input.parentElement
+						for (let level = 0; node && level < 6; level++, node = node.parentElement) {
+							yield {
+								tag: node.tagName.toLowerCase(),
+								id: node.id,
+								classes: [...node.classList],
+								text: (node.innerText || '').trim().replace(/\\s+/g, ' ').slice(0, 120),
+							}
+						}
+					}()],
+				}))
+		})()`)
+		await logout()
+		console.log(JSON.stringify({ settings, controls }, null, 2))
+		socket.close()
+		process.exit(0)
+	}
+
+	const persistedStates = []
+	for (const value of expectedValues) {
+		const writesBefore = requests.filter(url => url.includes('/apps/backgroundchanger/api/theme')).length
+		const responsesBefore = responses.filter(response => response.url.includes('/apps/backgroundchanger/api/theme')).length
+		const target = await themeControl(value)
+		assert(target, `${value} must be visible and selectable through the real settings UI`)
+		await command('Input.dispatchMouseEvent', {
+			type: 'mousePressed',
+			x: target.x,
+			y: target.y,
+			button: 'left',
+			buttons: 1,
+			clickCount: 1,
+		})
+		await sleep(50)
+		await command('Input.dispatchMouseEvent', {
+			type: 'mouseReleased',
+			x: target.x,
+			y: target.y,
+			button: 'left',
+			buttons: 0,
+			clickCount: 1,
+		})
+		const writeDeadline = Date.now() + 10_000
+		while (requests.filter(url => url.includes('/apps/backgroundchanger/api/theme')).length <= writesBefore
+			&& Date.now() < writeDeadline) {
+			await sleep(100)
+		}
+		assert(requests.filter(url => url.includes('/apps/backgroundchanger/api/theme')).length === writesBefore + 1,
+			`${value} must issue exactly one app-owned settings write`)
+		const responseDeadline = Date.now() + 10_000
+		while (responses.filter(response => response.url.includes('/apps/backgroundchanger/api/theme')).length <= responsesBefore
+			&& Date.now() < responseDeadline) {
+			await sleep(100)
+		}
+		const valueResponses = responses.filter(response => response.url.includes('/apps/backgroundchanger/api/theme')).slice(responsesBefore)
+		if (valueResponses.length !== 1 || valueResponses[0].status !== 200) {
+			let publicMessage = ''
+			if (valueResponses.length === 1) {
+				await sleep(200)
+				try {
+					const responseBody = await command('Network.getResponseBody', { requestId: valueResponses[0].requestId })
+					const parsed = JSON.parse(responseBody.body)
+					const candidate = parsed?.ocs?.meta?.message ?? parsed?.message ?? ''
+					publicMessage = typeof candidate === 'string' ? candidate.slice(0, 160) : ''
+				} catch (error) {
+					publicMessage = ''
+				}
+			}
+			throw new Error(`${value} must receive one successful app-owned settings response: ${JSON.stringify({
+				responses: valueResponses.map(response => ({
+					status: response.status,
+					authNotConfirmed: response.authNotConfirmed,
+				})),
+				request: themeRequests[writesBefore] ?? null,
+				publicMessage,
+			})}`)
+		}
+		assert(themeRequests[writesBefore]?.method === 'POST'
+			&& themeRequests[writesBefore]?.hasRequestToken === true
+			&& themeRequests[writesBefore]?.payload?.theme === value,
+			`${value} must use the CSRF-protected app-owned theme contract`)
+		await waitFor(`document.readyState === 'complete'`)
+		await waitFor(`document.body?.innerText.includes('Background Changer')`, 30_000)
+		await waitFor(`[...document.querySelectorAll('input[type="radio"]')].some(input => input.value === ${JSON.stringify(value)} && input.checked)`, 10_000)
+		if (value === 'off') {
+			await sleep(500)
+		} else {
+			await waitForBackground()
+		}
+		assert(await evaluate(`!document.querySelector('[role="dialog"]')`), 'No onboarding dialog may cover a theme screenshot')
+		const visibleControl = await themeControl(value)
+		assert(visibleControl?.carrier === 'checkbox-radio-switch__content',
+			'The selected Background Changer radio must be visible through its real NC34 click carrier')
+		assert(await evaluate(`(() => {
+			const input = [...document.querySelectorAll('.declarative-settings-section input[type="radio"]')]
+				.find(candidate => candidate.value === ${JSON.stringify(value)})
+			if (!input?.checked) return false
+			const section = input.closest('.declarative-settings-section')
+			const bounds = section?.getBoundingClientRect()
+			return Boolean(bounds && bounds.top >= 0 && bounds.bottom <= innerHeight)
+		})()`), 'The complete Background Changer section and selected radio must be inside the screenshot viewport')
+		const state = await snapshot()
+		const effectiveTheme = value === 'default' ? 'landscapes' : value
+		if (value === 'off') {
+			assert(state.metaCount === 0 && state.creditText === '', 'Off must remain disabled after reload')
+			assert(!state.bodyBackground.includes('/apps/backgroundchanger/'), 'Off must not paint an app background after reload')
+		} else {
+			assert(state.theme === effectiveTheme, `${value} must persist as ${effectiveTheme} after reload`)
+			assert(state.readyId === state.id, `${value} must paint only a decoded background after reload`)
+			assert(state.creditText.includes('designed by chrissi0285'), `${value} must retain attribution after reload`)
+		}
+		state.preference = value
+		state.screenshotHash = await screenshot(`theme-settings-${value}`)
+		persistedStates.push(state)
+	}
+
+	await navigate(`${nextcloudBase}/index.php/apps/files/files`)
+	await waitForBackground()
+	const filesBeforeRouter = await snapshot()
+	const selectionsBeforeRouter = requests.filter(url => url.includes('/apps/backgroundchanger/api/background')).length
+	const filesUrl = filesBeforeRouter.url
+	const routerTarget = await evaluate(`(async () => {
+		const entries = [...document.querySelectorAll(
+			'.files-list__row-name-link, [data-cy-files-list-row-name-link]',
+		)]
+		const target = entries.find(entry => entry.closest('[data-mime="httpd/unix-directory"]')
+			|| entry.closest('[data-type="dir"]')) || entries[0]
+		if (!target) return null
+		target.scrollIntoView({ block: 'center', inline: 'nearest' })
+		await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+		const bounds = target.getBoundingClientRect()
+		if (bounds.width <= 0 || bounds.height <= 0) return null
+		const x = bounds.left + bounds.width / 2
+		const y = bounds.top + bounds.height / 2
+		const hit = document.elementFromPoint(x, y)
+		if (!(hit === target || target.contains(hit))) return null
+		return { x, y }
+	})()`)
+	assert(routerTarget, 'Files must expose a visible and hit-testable in-app router target')
+	await command('Input.dispatchMouseEvent', {
+		type: 'mouseMoved',
+		x: routerTarget.x,
+		y: routerTarget.y,
+	})
+	await command('Input.dispatchMouseEvent', {
+		type: 'mousePressed',
+		x: routerTarget.x,
+		y: routerTarget.y,
+		button: 'left',
+		buttons: 1,
+		clickCount: 1,
+	})
+	await sleep(50)
+	await command('Input.dispatchMouseEvent', {
+		type: 'mouseReleased',
+		x: routerTarget.x,
+		y: routerTarget.y,
+		button: 'left',
+		buttons: 0,
+		clickCount: 1,
+	})
+	await waitFor(`location.href !== ${JSON.stringify(filesUrl)}`)
+	const routerId = await changesFrom(filesBeforeRouter.id, 10_000)
+	assert(routerId !== '', 'The real Files router transition must change the background')
+	await waitForBackground()
+	const filesAfterRouter = await snapshot()
+	await screenshot('theme-router-files')
+	const selectionsAfterRouter = requests.filter(url => url.includes('/apps/backgroundchanger/api/background')).length
+	assert(selectionsAfterRouter === selectionsBeforeRouter + 1,
+		'The real Files router transition must request exactly one new local selection')
+	assert(filesAfterRouter.id !== filesBeforeRouter.id,
+		'The real Files router transition must paint a different local image')
+
+	await navigate(`${nextcloudBase}/index.php/settings/user/theming`)
+	await waitFor(`document.querySelector('.settings-section.background')`, 30_000)
+	await dismissOnboarding()
+	await waitFor(`!document.querySelector('[role="dialog"]')`)
+	const personalWritesBefore = requests.filter(url => url.includes('/apps/theming/background/shipped')).length
+	const personalResponsesBefore = responses.filter(response => response.url.includes('/apps/theming/background/shipped')).length
+	const personalTarget = await personalBackgroundControl()
+	assert(personalTarget?.ariaLabel, 'A visible shipped Nextcloud personal background must be selectable')
+	await command('Input.dispatchMouseEvent', {
+		type: 'mousePressed',
+		x: personalTarget.x,
+		y: personalTarget.y,
+		button: 'left',
+		buttons: 1,
+		clickCount: 1,
+	})
+	await sleep(50)
+	await command('Input.dispatchMouseEvent', {
+		type: 'mouseReleased',
+		x: personalTarget.x,
+		y: personalTarget.y,
+		button: 'left',
+		buttons: 0,
+		clickCount: 1,
+	})
+	const personalDeadline = Date.now() + 10_000
+	while (responses.filter(response => response.url.includes('/apps/theming/background/shipped')).length <= personalResponsesBefore
+		&& Date.now() < personalDeadline) {
+		await sleep(100)
+	}
+	const personalResponses = responses
+		.filter(response => response.url.includes('/apps/theming/background/shipped'))
+		.slice(personalResponsesBefore)
+	assert(requests.filter(url => url.includes('/apps/theming/background/shipped')).length === personalWritesBefore + 1,
+		'A real personal background click must issue exactly one Nextcloud theming write')
+	assert(personalResponses.length === 1 && personalResponses[0].status === 200,
+		'The Nextcloud personal background write must receive HTTP 200')
+	await waitFor(`[...document.querySelectorAll('.settings-section.background button[aria-pressed="true"]')]
+		.some(button => button.getAttribute('aria-label') === ${JSON.stringify(personalTarget.ariaLabel)})`)
+	await screenshot('nextcloud-personal-background-setting')
+
+	const selectionsBeforePersonalPage = requests.filter(url => url.includes('/apps/backgroundchanger/api/background')).length
+	const imagesBeforePersonalPage = requests.filter(url => url.includes('/apps/backgroundchanger/api/image/')).length
+	await navigate(`${nextcloudBase}/index.php/apps/dashboard/`)
+	await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`)
+	const personal = await snapshot()
+	await screenshot('nextcloud-personal-background')
+	assert(personal.metaCount === 0, 'A personal Nextcloud background must suppress the Background Changer endpoint')
+	assert(personal.creditText === '', 'A personal Nextcloud background must suppress Background Changer attribution')
+	assert(!personal.background.includes('/apps/backgroundchanger/'),
+		'A personal Nextcloud background must suppress Background Changer CSS')
+	assert(requests.filter(url => url.includes('/apps/backgroundchanger/api/background')).length === selectionsBeforePersonalPage,
+		'A personal Nextcloud background must suppress local Background Changer selections')
+	assert(requests.filter(url => url.includes('/apps/backgroundchanger/api/image/')).length === imagesBeforePersonalPage,
+		'A personal Nextcloud background must suppress local Background Changer images')
+
+	const appThemeWrites = requests.filter(url => url.includes('/apps/backgroundchanger/api/theme'))
+	const appThemeResponses = responses.filter(response => response.url.includes('/apps/backgroundchanger/api/theme'))
+	const coreDeclarativeWrites = requests.filter(url => url.includes('/settings/api/declarative/value'))
+	const providerHosts = requests
+		.filter(url => url.startsWith('http://') || url.startsWith('https://'))
+		.map(url => new URL(url).hostname)
+		.filter(host => /(?:wikimedia|wikimedia\.org|creativecommons\.org|unsplash|wallhaven|bing)/i.test(host))
+	assert(appThemeWrites.length === expectedValues.length,
+		`Expected ${expectedValues.length} app-owned settings writes, got ${appThemeWrites.length}`)
+	assert(appThemeResponses.length === expectedValues.length
+		&& appThemeResponses.every(response => response.status === 200),
+		'Every app-owned settings write must receive HTTP 200')
+	assert(coreDeclarativeWrites.length === 0, 'The defective NC34 declarative write route must not be called')
+	assert(providerHosts.length === 0, `Browser contacted a provider: ${providerHosts.join(', ')}`)
+	assert(exceptions.length === 0, `Browser exceptions: ${exceptions.join('; ')}`)
+	await logout()
+	console.log(JSON.stringify({
+		settings,
+		persistedStates,
+		router: {
+			beforeId: filesBeforeRouter.id,
+			afterId: filesAfterRouter.id,
+			selectionDelta: selectionsAfterRouter - selectionsBeforeRouter,
+		},
+		personal: {
+			backgroundLabel: personalTarget.ariaLabel,
+			metaCount: personal.metaCount,
+			creditText: personal.creditText,
+			selectionDelta: requests.filter(url => url.includes('/apps/backgroundchanger/api/background')).length - selectionsBeforePersonalPage,
+			imageDelta: requests.filter(url => url.includes('/apps/backgroundchanger/api/image/')).length - imagesBeforePersonalPage,
+		},
+		appThemeWrites: appThemeWrites.length,
+		coreDeclarativeWrites: 0,
+		providerRequests: 0,
+		exceptions,
+	}, null, 2))
+	socket.close()
+	process.exit(0)
+}
+
 if (mode === 'personal') {
 	await navigate(`${nextcloudBase}/index.php/apps/files/files`)
 	await sleep(2000)
@@ -348,6 +808,69 @@ if (mode === 'guest') {
 	process.exit(0)
 }
 
+if (mode === 'theme' || mode === 'suppressed') {
+	const selectableThemes = new Set(['landscapes', 'animals', 'space', 'architecture'])
+	if (mode === 'theme' && !selectableThemes.has(expectedTheme)) {
+		throw new Error('Theme mode requires landscapes, animals, space or architecture')
+	}
+	if (mode === 'suppressed' && !new Set(['off', 'personal']).has(expectedTheme)) {
+		throw new Error('Suppressed mode requires off or personal')
+	}
+
+	await navigate(`${nextcloudBase}/login`)
+	await waitFor(`document.querySelector('input[name="user"]') && document.querySelector('input[name="password"]')`)
+	await waitForBackground()
+	const anonymous = await snapshot()
+	assert(anonymous.theme === 'landscapes', 'Anonymous login must use landscapes')
+	await submitLogin()
+	await navigate(`${nextcloudBase}/index.php/apps/dashboard/`)
+	let resultState
+
+	if (mode === 'theme') {
+		await waitForBackground()
+		const themed = await snapshot()
+		themed.backgroundCropHash = await screenshot(`theme-${expectedTheme}-background`, {
+			x: 0,
+			y: 50,
+			width: 500,
+			height: 700,
+		})
+		await screenshot(`theme-${expectedTheme}`)
+		assert(themed.theme === expectedTheme, `Expected ${expectedTheme}, got ${themed.theme}`)
+		assert(themed.readyId === themed.id, 'Only a decoded themed background may be ready')
+		assert(themed.creditText.includes('designed by chrissi0285'), 'The exact design line must be visible')
+		assert(themed.creditHosts.includes('commons.wikimedia.org'), 'Commons source attribution must be linked')
+		assert(themed.creditHosts.includes('creativecommons.org'), 'License attribution must be linked')
+		resultState = { themed }
+	} else {
+		await sleep(2000)
+		const suppressed = await snapshot()
+		await screenshot(`theme-${expectedTheme}`)
+		assert(suppressed.metaCount === 0, `${expectedTheme} must suppress the endpoint`)
+		assert(suppressed.creditText === '', `${expectedTheme} must suppress attribution`)
+		assert(!suppressed.bodyBackground.includes('/apps/backgroundchanger/'), `${expectedTheme} must suppress the app image`)
+		resultState = { suppressed }
+	}
+
+	const providerHosts = requests
+		.filter(url => url.startsWith('http://') || url.startsWith('https://'))
+		.map(url => new URL(url).hostname)
+		.filter(host => /(?:wikimedia|wikimedia\.org|creativecommons\.org|unsplash|wallhaven|bing)/i.test(host))
+	assert(providerHosts.length === 0, `Browser contacted a provider: ${providerHosts.join(', ')}`)
+	assert(exceptions.length === 0, `Browser exceptions: ${exceptions.join('; ')}`)
+	await logout()
+	console.log(JSON.stringify({
+		mode,
+		expectedTheme,
+		anonymous,
+		...resultState,
+		providerRequests: providerHosts.length,
+		exceptions,
+	}, null, 2))
+	socket.close()
+	process.exit(0)
+}
+
 await navigate(`${nextcloudBase}/login`)
 await waitFor(`document.querySelector('input[name="user"]') && document.querySelector('input[name="password"]')`)
 await waitForBackground()
@@ -361,24 +884,7 @@ assert(login.creditText.length > 0, 'Login page must show attribution')
 assert(login.creditText.includes('designed by chrissi0285'), 'Login page must show the exact design line')
 assert(login.bodyBackground.includes('backgroundchanger'), 'Login page must use a local Background Changer image')
 
-await evaluate(`(() => {
-	const user = document.querySelector('input[name="user"]')
-	const pass = document.querySelector('input[name="password"]')
-	user.value = ${JSON.stringify(username)}
-	pass.value = ${JSON.stringify(password)}
-	user.dispatchEvent(new Event('input', { bubbles: true }))
-	pass.dispatchEvent(new Event('input', { bubbles: true }))
-	if (${JSON.stringify(mode === 'authenticated')}) {
-		const remember = document.querySelector('input[name="remember_login"]')
-		if (remember) {
-			remember.checked = false
-			remember.dispatchEvent(new Event('change', { bubbles: true }))
-		}
-	}
-	document.querySelector('form').requestSubmit()
-})()`)
-await waitFor(`location.pathname !== '/login'`, 30_000)
-await waitFor(`document.readyState === 'complete'`)
+await submitLogin()
 await waitForBackground()
 const onDashboard = await evaluate(`location.pathname.includes('/apps/dashboard')`)
 if (!onDashboard) {
@@ -507,19 +1013,7 @@ assert(imageRequests.length <= selectionRequests.length,
 	`Local image requests must not exceed selections, got ${imageRequests.length}`)
 
 if (mode === 'authenticated') {
-	const logoutUrl = await evaluate(`(() => {
-		if (typeof window.OC?.generateUrl !== 'function' || typeof window.OC?.requestToken !== 'string') {
-			return ''
-		}
-		const url = new URL(window.OC.generateUrl('/logout'), location.origin)
-		url.searchParams.set('requesttoken', window.OC.requestToken)
-		return url.href
-	})()`)
-	const parsedLogoutUrl = new URL(logoutUrl)
-	assert(parsedLogoutUrl.origin === new URL(nextcloudBase).origin
-		&& parsedLogoutUrl.pathname.endsWith('/logout'), 'Nextcloud logout URL must stay on the tested origin')
-	await navigate(logoutUrl)
-	await waitFor(`document.querySelector('input[name="user"]') && document.querySelector('input[name="password"]')`)
+	await logout()
 	console.log(JSON.stringify({
 		authenticatedLifecycle: {
 			loginId: login.id,

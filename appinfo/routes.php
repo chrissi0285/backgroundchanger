@@ -23,5 +23,10 @@ return [
 				'id' => '[a-f0-9]{32}',
 			],
 		],
+		[
+			'name' => 'settings#setTheme',
+			'url' => '/api/theme',
+			'verb' => 'POST',
+		],
 	],
 ];
