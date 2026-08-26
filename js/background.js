@@ -96,6 +96,46 @@
 		return anchor
 	}
 
+	/**
+	 * The badge stays collapsed so it never covers page content. Hover and
+	 * keyboard focus unfold it through CSS alone; the button keeps the
+	 * attribution reachable on touch devices too.
+	 */
+	function creditElement() {
+		const existing = document.getElementById('backgroundchanger-credit')
+		if (existing) {
+			return existing
+		}
+
+		const credit = document.createElement('aside')
+		credit.id = 'backgroundchanger-credit'
+		credit.setAttribute('aria-label', 'Image attribution')
+
+		const toggle = document.createElement('button')
+		toggle.type = 'button'
+		toggle.className = 'backgroundchanger-toggle'
+		toggle.textContent = 'i'
+		toggle.setAttribute('aria-expanded', 'false')
+		toggle.setAttribute('aria-label', 'Show image attribution')
+		toggle.addEventListener('click', () => {
+			toggle.setAttribute('aria-expanded', credit.toggleAttribute('data-open') ? 'true' : 'false')
+		})
+		credit.addEventListener('keydown', event => {
+			if (event.key === 'Escape' && credit.hasAttribute('data-open')) {
+				credit.removeAttribute('data-open')
+				toggle.setAttribute('aria-expanded', 'false')
+				toggle.focus()
+			}
+		})
+
+		const panel = document.createElement('div')
+		panel.className = 'backgroundchanger-panel'
+
+		credit.append(toggle, panel)
+		document.body.appendChild(credit)
+		return credit
+	}
+
 	function renderCredit(background) {
 		const source = externalUrl(background.sourceUrl, 'commons.wikimedia.org')
 		const licence = externalUrl(background.licenseUrl, 'creativecommons.org')
@@ -103,13 +143,8 @@
 			return false
 		}
 
-		let credit = document.getElementById('backgroundchanger-credit')
-		if (!credit) {
-			credit = document.createElement('aside')
-			credit.id = 'backgroundchanger-credit'
-			credit.setAttribute('aria-label', 'Image attribution')
-			document.body.appendChild(credit)
-		}
+		const credit = creditElement()
+		const panel = credit.querySelector('.backgroundchanger-panel')
 
 		const attribution = document.createElement('span')
 		attribution.className = 'backgroundchanger-attribution'
@@ -126,11 +161,11 @@
 		const design = document.createElement('span')
 		design.className = 'backgroundchanger-design'
 		design.textContent = 'designed by chrissi0285'
-		credit.replaceChildren(attribution, design)
+		panel.replaceChildren(attribution, design)
 		if (background.description) {
-			credit.title = background.description
+			panel.title = background.description
 		} else {
-			credit.removeAttribute('title')
+			panel.removeAttribute('title')
 		}
 		return true
 	}

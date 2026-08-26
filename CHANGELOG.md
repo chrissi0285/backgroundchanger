@@ -14,6 +14,9 @@
   complete attribution.
 - Derive the app icon from the central `chrissi0285` symbol and display
   `designed by chrissi0285`.
+- Collapse the attribution into a small badge that only unfolds on hover,
+  keyboard focus or an explicit press, so it never covers page content, and
+  hide it while printing because browsers do not print the background image.
 - Use `chrissi0285` exclusively in public author and copyright metadata.
 
 ## Wechselbild predecessor history

@@ -20,11 +20,55 @@ html:not([data-backgroundchanger-disabled]) body#body-login {
 	background-size: cover !important;
 }
 
+/*
+ * The attribution stays reachable but must never cover page content. It rests
+ * as a small badge and only unfolds on hover, keyboard focus or an explicit
+ * press.
+ */
 #backgroundchanger-credit {
 	position: fixed;
 	right: max(8px, env(safe-area-inset-right));
 	bottom: max(8px, env(safe-area-inset-bottom));
 	z-index: 2000;
+	line-height: 0;
+}
+
+#backgroundchanger-credit .backgroundchanger-toggle {
+	width: 22px;
+	height: 22px;
+	min-width: 0;
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	border: 1px solid rgb(255 255 255 / 30%);
+	border-radius: 50%;
+	background: rgb(7 16 25 / 45%);
+	box-shadow: none;
+	color: #fff;
+	opacity: 0.4;
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 20px;
+	text-align: center;
+	transition: opacity 120ms ease-in-out;
+}
+
+#backgroundchanger-credit:hover .backgroundchanger-toggle,
+#backgroundchanger-credit:focus-within .backgroundchanger-toggle,
+#backgroundchanger-credit[data-open] .backgroundchanger-toggle {
+	opacity: 1;
+}
+
+#backgroundchanger-credit .backgroundchanger-panel {
+	position: absolute;
+	right: 0;
+	bottom: calc(100% + 6px);
+	visibility: hidden;
+	opacity: 0;
+	pointer-events: none;
+	box-sizing: border-box;
+	width: max-content;
 	max-width: min(70vw, 620px);
 	padding: 6px 10px;
 	border: 1px solid rgb(108 255 188 / 45%);
@@ -39,6 +83,15 @@ html:not([data-backgroundchanger-disabled]) body#body-login {
 	line-height: 1.35;
 	text-align: right;
 	backdrop-filter: blur(5px);
+	transition: opacity 120ms ease-in-out, visibility 120ms ease-in-out;
+}
+
+#backgroundchanger-credit:hover .backgroundchanger-panel,
+#backgroundchanger-credit:focus-within .backgroundchanger-panel,
+#backgroundchanger-credit[data-open] .backgroundchanger-panel {
+	visibility: visible;
+	opacity: 1;
+	pointer-events: auto;
 }
 
 #backgroundchanger-credit .backgroundchanger-design {
@@ -54,21 +107,39 @@ html:not([data-backgroundchanger-disabled]) body#body-login {
 	text-underline-offset: 2px;
 }
 
-#backgroundchanger-credit a:focus-visible {
+#backgroundchanger-credit a:focus-visible,
+#backgroundchanger-credit .backgroundchanger-toggle:focus-visible {
 	outline: 2px solid #fff;
 	outline-offset: 2px;
 }
 
 @media (max-width: 700px) {
-	#backgroundchanger-credit {
+	#backgroundchanger-credit .backgroundchanger-panel {
 		max-width: calc(100vw - 16px);
 		font-size: 11px;
 	}
 }
 
 @media (prefers-reduced-transparency: reduce) {
-	#backgroundchanger-credit {
+	#backgroundchanger-credit .backgroundchanger-panel {
 		background: #071019;
 		backdrop-filter: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#backgroundchanger-credit .backgroundchanger-toggle,
+	#backgroundchanger-credit .backgroundchanger-panel {
+		transition: none;
+	}
+}
+
+/*
+ * Browsers do not print the CSS background image, so printing its attribution
+ * would credit an image that is not on the page.
+ */
+@media print {
+	#backgroundchanger-credit {
+		display: none !important;
 	}
 }
