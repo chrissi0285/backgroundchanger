@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.1 (2026-09-25)
+
+- Extend the supported Nextcloud version range to 34–35.
+- Accept Wikimedia Commons' official `thumb.wikimedia.org` thumbnail endpoint,
+  restoring cache refreshes while retaining exact-host, path, license and image
+  validation. Add regression coverage for the endpoint and rejected lookalikes.
+- Adapt the cache test double to Nextcloud 35's `ISimpleFolder` contract and
+  verify that getting or creating a folder preserves an existing folder.
+- Require an explicit browser target when tests connect to a shared browser.
+- Adapt personal-background UI checks to Nextcloud 35's button labels and
+  compare consecutive background selections rather than non-consecutive ones.
+
 ## ImageChanger 1.0.0 (unreleased)
 
 - Introduce the independent `backgroundchanger` identifier and

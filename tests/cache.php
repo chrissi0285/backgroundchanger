@@ -137,6 +137,10 @@ final class MemoryFolder implements ISimpleFolder {
 		return $folder;
 	}
 
+	public function getOrCreateFolder(string $path, int $maxRetries = 5): ISimpleFolder {
+		return $this->folders[$path] ?? $this->newFolder($path);
+	}
+
 	public function remove(string $name): void {
 		unset($this->files[$name]);
 	}
@@ -195,6 +199,11 @@ function downloadFixture(int $number): array {
 		'sourceUrl' => 'https://commons.wikimedia.org/wiki/File:Landscape_' . $number . '.jpg',
 	];
 }
+
+$folder = new MemoryFolder('contract');
+$child = $folder->getOrCreateFolder('child');
+checkCache($child === $folder->getFolder('child'), 'Folder is created when absent');
+checkCache($child === $folder->getOrCreateFolder('child'), 'Existing folder is reused');
 
 $root = new MemoryAppData();
 $cache = new CacheService($root);

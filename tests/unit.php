@@ -49,6 +49,13 @@ expect(MetadataPolicy::extensionForMime('text/html') === null, 'HTML must be rej
 expect(MetadataPolicy::licenseUrl('CC BY-SA 4.0') === 'https://creativecommons.org/licenses/by-sa/4.0/', 'Known license URL');
 expect(MetadataPolicy::licenseUrl('All rights reserved') === null, 'Non-free license must be rejected');
 expect(MetadataPolicy::isImageUrl('https://upload.wikimedia.org/wikipedia/commons/a/a.jpg'), 'Official image host');
+expect(MetadataPolicy::isImageUrl('https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Alpine_lake.jpg/1920px-Alpine_lake.jpg'), 'Official Commons thumbnail host');
+expect(!MetadataPolicy::isImageUrl('https://thumb.wikimedia.org.evil.example/wikipedia/commons/thumb/a.jpg'), 'Thumbnail suffix host attack');
+expect(!MetadataPolicy::isImageUrl('http://thumb.wikimedia.org/wikipedia/commons/thumb/a.jpg'), 'Thumbnail plain HTTP');
+expect(!MetadataPolicy::isImageUrl('https://user@thumb.wikimedia.org/wikipedia/commons/thumb/a.jpg'), 'Thumbnail credentials in URL');
+expect(!MetadataPolicy::isImageUrl('https://thumb.wikimedia.org:444/wikipedia/commons/thumb/a.jpg'), 'Thumbnail foreign port');
+expect(!MetadataPolicy::isImageUrl('https://thumb.wikimedia.org/wikipedia/en/thumb/a.jpg'), 'Thumbnail must belong to Commons');
+expect(!MetadataPolicy::isImageUrl('https://thumb.wikimedia.org/wikipedia/commons/a.jpg'), 'Thumbnail host only serves thumbnail paths');
 expect(!MetadataPolicy::isImageUrl('https://upload.wikimedia.org.evil.example/wikipedia/commons/a.jpg'), 'Suffix host attack');
 expect(!MetadataPolicy::isImageUrl('http://upload.wikimedia.org/wikipedia/commons/a.jpg'), 'Plain HTTP');
 expect(!MetadataPolicy::isImageUrl('https://user@upload.wikimedia.org/wikipedia/commons/a.jpg'), 'Credentials in URL');
@@ -68,6 +75,9 @@ expect($candidate['title'] === 'File:Alpine lake.jpg', 'Title sanitization');
 expect($candidate['author'] === 'Alice & Bob', 'Author sanitization');
 expect($candidate['description'] === 'Lake under a blue sky', 'Description sanitization');
 expect($candidate['licenseUrl'] === 'https://creativecommons.org/licenses/by-sa/4.0/', 'Canonical license link');
+$thumbnailPage = validPage();
+$thumbnailPage['imageinfo'][0]['thumburl'] = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Alpine_lake.jpg/1920px-Alpine_lake.jpg';
+expect(MetadataPolicy::candidateFromPage($thumbnailPage) !== null, 'Commons thumbnail endpoint metadata must remain usable');
 
 $invalidHost = validPage();
 $invalidHost['imageinfo'][0]['thumburl'] = 'https://example.org/wikipedia/commons/image.jpg';
@@ -101,10 +111,10 @@ expect($xpath->evaluate('string(/info/id)') === 'backgroundchanger', 'Independen
 expect($xpath->evaluate('string(/info/name)') === 'ImageChanger', 'International app name');
 expect($xpath->evaluate('string(/info/namespace)') === 'BackgroundChanger', 'Independent namespace');
 expect($xpath->evaluate('string(/info/author)') === 'chrissi0285', 'Public author identity');
-expect($xpath->evaluate('string(/info/version)') === '1.0.0', 'New app starts with a new release line');
+expect($xpath->evaluate('string(/info/version)') === '1.0.1', 'NC35 compatibility release');
 expect($xpath->evaluate('string(/info/repository)') === 'https://github.com/chrissi0285/backgroundchanger.git', 'Repository identity');
 expect($xpath->evaluate('string(/info/dependencies/nextcloud/@min-version)') === '34', 'Nextcloud minimum');
-expect($xpath->evaluate('string(/info/dependencies/nextcloud/@max-version)') === '34', 'Nextcloud maximum');
+expect($xpath->evaluate('string(/info/dependencies/nextcloud/@max-version)') === '35', 'Nextcloud maximum');
 expect(!file_exists(__DIR__ . '/../appinfo/signature.json'), 'No foreign signature may be bundled');
 
 expect(ThemeService::cacheThemes() === ['landscapes', 'animals', 'space', 'architecture'], 'Curated cache themes');

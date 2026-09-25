@@ -68,7 +68,8 @@ final class MetadataPolicy {
 	}
 
 	public static function isImageUrl(string $url): bool {
-		return self::isHttpsUrlForHost($url, 'upload.wikimedia.org', '/wikipedia/commons/');
+		return self::isHttpsUrlForHost($url, 'upload.wikimedia.org', '/wikipedia/commons/')
+			|| self::isHttpsUrlForHost($url, 'thumb.wikimedia.org', '/wikipedia/commons/thumb/');
 	}
 
 	public static function isSourceUrl(string $url): bool {
