@@ -111,7 +111,7 @@ expect($xpath->evaluate('string(/info/id)') === 'backgroundchanger', 'Independen
 expect($xpath->evaluate('string(/info/name)') === 'ImageChanger', 'International app name');
 expect($xpath->evaluate('string(/info/namespace)') === 'BackgroundChanger', 'Independent namespace');
 expect($xpath->evaluate('string(/info/author)') === 'chrissi0285', 'Public author identity');
-expect($xpath->evaluate('string(/info/version)') === '1.0.1', 'NC35 compatibility release');
+expect($xpath->evaluate('string(/info/version)') === '1.0.2', 'NC35 settings robustness release');
 expect($xpath->evaluate('string(/info/repository)') === 'https://github.com/chrissi0285/backgroundchanger.git', 'Repository identity');
 expect($xpath->evaluate('string(/info/dependencies/nextcloud/@min-version)') === '34', 'Nextcloud minimum');
 expect($xpath->evaluate('string(/info/dependencies/nextcloud/@max-version)') === '35', 'Nextcloud maximum');

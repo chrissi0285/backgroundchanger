@@ -18,6 +18,7 @@ php tests/unit.php
 node --check js/background.js
 node --check js/settings.js
 node --check tests/browser-test.mjs
+node --test tests/settings-test.mjs tests/http-check-test.mjs
 bash -n tests/runi-install.sh
 bash -n tests/runi-declarative-http-check.sh
 xmllint --noout appinfo/info.xml

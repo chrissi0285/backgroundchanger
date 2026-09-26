@@ -25,10 +25,15 @@
 		return section.textContent?.includes('ImageChanger') ? field : null
 	}
 
-	function notifyFailure() {
-		if (window.OC?.Notification?.showTemporary) {
-			window.OC.Notification.showTemporary('ImageChanger could not save the theme.')
+	function notifyFailure(field) {
+		let message = field.querySelector('.backgroundchanger-save-error')
+		if (!message) {
+			message = document.createElement('p')
+			message.className = 'backgroundchanger-save-error'
+			message.setAttribute('role', 'alert')
+			field.appendChild(message)
 		}
+		message.textContent = 'ImageChanger could not save the theme. Please try again.'
 	}
 
 	function radioFromClick(target) {
@@ -41,9 +46,14 @@
 	}
 
 	async function saveTheme(input, field) {
-		if (saving || typeof window.OC?.generateUrl !== 'function' || typeof window.OC?.requestToken !== 'string') {
+		if (saving || input.disabled) {
 			return
 		}
+		if (typeof window.OC?.generateUrl !== 'function' || typeof window.OC?.requestToken !== 'string') {
+			notifyFailure(field)
+			return
+		}
+		field.querySelector('.backgroundchanger-save-error')?.remove()
 		saving = true
 		const radios = [...field.querySelectorAll('input[type="radio"]')]
 		const previous = radios.find(candidate => candidate.checked && candidate !== input) || null
@@ -79,9 +89,30 @@
 				candidate.disabled = false
 			})
 			saving = false
-			notifyFailure()
+			input.focus()
+			notifyFailure(field)
 		}
 	}
+
+	// Capture before the declarative form: its keyboard path must not submit
+	// to a different endpoint than mouse selection. Tab keeps native behavior.
+	document.addEventListener('keydown', event => {
+		const input = event.target
+		const field = themeField(input)
+		if (!field || ![' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+			return
+		}
+		event.preventDefault()
+		event.stopImmediatePropagation()
+		if (saving || input.disabled || event.repeat) {
+			return
+		}
+		const radios = [...field.querySelectorAll('input[type="radio"]')].filter(candidate => !candidate.disabled)
+		const direction = ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 1
+		const target = event.key === ' ' ? input : radios[(radios.indexOf(input) + direction + radios.length) % radios.length]
+		target.focus()
+		void saveTheme(target, field)
+	}, true)
 
 	document.addEventListener('click', event => {
 		const input = radioFromClick(event.target)

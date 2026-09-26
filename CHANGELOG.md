@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.2 (2026-09-26)
+
+- Display an accessible inline save error even when the deprecated
+  `OC.Notification` API is unavailable, preserving the previous saved choice.
+- Support arrow-key and space-key theme selection through the same validated
+  save endpoint as mouse selection, without duplicate writes.
+- Assert HTTP status, OCS status and persisted values in the declarative-settings
+  contract check; add regression tests for rejected responses and persistence.
+- Verify all themes, keyboard selection, visible HTTP/response/network failures
+  and rejected unauthenticated/CSRF-free/invalid writes in a real isolated
+  Nextcloud 35 installation for ordinary users and administrators.
+
 ## 1.0.1 (2026-09-25)
 
 - Extend the supported Nextcloud version range to 34–35.
