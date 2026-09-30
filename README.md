@@ -1,7 +1,7 @@
 # ImageChanger
 
 ImageChanger shows rotating Wikimedia Commons backgrounds on Nextcloud
-34. It rotates on page loads, same-origin link clicks, internal router changes
+34 and 35. It rotates on page loads, same-origin link clicks, internal router changes
 (including semantic non-link menu controls), browser Back/Forward and every
 five minutes while the page is visible. Clicking an already active Nextcloud
 route also selects a new background. Images are validated and served from
@@ -22,7 +22,7 @@ one theme at a time to limit provider traffic, storage and CPU use.
 ## Security and privacy
 
 - App identifier `backgroundchanger` and namespace `OCA\BackgroundChanger`
-- Nextcloud 34 and PHP 8.2–8.5
+- Nextcloud 34–35 and PHP 8.2–8.5 (subject to the server's PHP requirements)
 - fixed 1920-pixel Wikimedia Commons thumbnails
 - strict image host, MIME type, dimensions, response size and free-license
   allow-lists
