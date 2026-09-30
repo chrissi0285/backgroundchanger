@@ -147,7 +147,9 @@ def sign(repo, unsigned, key_path, certificate_path, tag, output):
     if [a.value for a in certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)] != ["backgroundchanger"]:
         raise ReleaseError("Certificate CN must be backgroundchanger")
     now = datetime.now(timezone.utc)
-    if not certificate.not_valid_before_utc <= now <= certificate.not_valid_after_utc:
+    before = getattr(certificate, 'not_valid_before_utc', None) or certificate.not_valid_before.replace(tzinfo=timezone.utc)
+    after = getattr(certificate, 'not_valid_after_utc', None) or certificate.not_valid_after.replace(tzinfo=timezone.utc)
+    if not before <= now <= after:
         raise ReleaseError("Certificate is not currently valid")
     key = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
     public = certificate.public_key()
