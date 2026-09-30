@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.4 (2026-09-30)
+
+- Unify the visible product name as BackgroundChanger, retaining the existing
+  backgroundchanger app ID, certificate, settings and update channel.
+- Merge the published settings fixes with the previously missing collapsed
+  attribution and print-hiding fix.
+- Guard releases against stale/divergent source trees and add browser
+  regression checks for attribution behavior.
+
+
 ## 1.0.3 (2026-09-30)
 
 - Restore the previously approved collapsed attribution badge and print hiding.

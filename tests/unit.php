@@ -108,10 +108,10 @@ $info = new DOMDocument();
 expect($info->load(__DIR__ . '/../appinfo/info.xml'), 'info.xml must parse');
 $xpath = new DOMXPath($info);
 expect($xpath->evaluate('string(/info/id)') === 'backgroundchanger', 'Independent app identifier');
-expect($xpath->evaluate('string(/info/name)') === 'ImageChanger', 'International app name');
+expect($xpath->evaluate('string(/info/name)') === 'BackgroundChanger', 'Unified public app name');
 expect($xpath->evaluate('string(/info/namespace)') === 'BackgroundChanger', 'Independent namespace');
 expect($xpath->evaluate('string(/info/author)') === 'chrissi0285', 'Public author identity');
-expect($xpath->evaluate('string(/info/version)') === '1.0.3', 'Attribution restoration release');
+expect($xpath->evaluate('string(/info/version)') === '1.0.4', 'Unified identity release');
 expect($xpath->evaluate('string(/info/repository)') === 'https://github.com/chrissi0285/backgroundchanger.git', 'Repository identity');
 expect($xpath->evaluate('string(/info/dependencies/nextcloud/@min-version)') === '34', 'Nextcloud minimum');
 expect($xpath->evaluate('string(/info/dependencies/nextcloud/@max-version)') === '35', 'Nextcloud maximum');
@@ -174,7 +174,7 @@ expect($themeRoutes === [[
 ]], 'Exactly one POST-only app-owned theme route');
 $refresh = file_get_contents(__DIR__ . '/../lib/Service/RefreshService.php');
 expect(is_string($refresh)
-	&& str_contains($refresh, "logger->debug('ImageChanger rejected a Commons candidate"),
+	&& str_contains($refresh, "logger->debug('BackgroundChanger rejected a Commons candidate"),
 	'Expected provider candidate rejections stay below the Nextcloud warning level');
 
 fwrite(STDOUT, sprintf("%d unit checks passed.\n", $tests));

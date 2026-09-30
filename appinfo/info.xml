@@ -2,7 +2,7 @@
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
     <id>backgroundchanger</id>
-    <name>ImageChanger</name>
+    <name>BackgroundChanger</name>
     <summary>Rotating, locally cached Wikimedia Commons backgrounds</summary>
     <summary lang="de">Wechselnde, lokal gespeicherte Wikimedia-Commons-Hintergründe</summary>
     <description><![CDATA[
@@ -22,7 +22,7 @@ geprüft, getrennt nach Thema lokal gespeichert und mit Urheber, Lizenz und
 Quelle ausgewiesen. Der Browser spricht nur mit Nextcloud; die letzten gültigen
 Bilder bleiben offline verfügbar.
     ]]></description>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
     <licence>agpl</licence>
     <author homepage="https://github.com/chrissi0285">chrissi0285</author>
     <namespace>BackgroundChanger</namespace>

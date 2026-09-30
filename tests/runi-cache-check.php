@@ -10,7 +10,7 @@ declare(strict_types=1);
 $root = $argv[1] ?? '';
 if (!preg_match('#^/var/nextcloud-data/appdata_[a-z0-9]+/backgroundchanger/backgrounds$#D', $root)
 	|| !is_dir($root)) {
-	throw new RuntimeException('Pass the isolated ImageChanger AppData cache root');
+	throw new RuntimeException('Pass the isolated BackgroundChanger AppData cache root');
 }
 
 $themes = ['landscapes', 'animals', 'space', 'architecture'];

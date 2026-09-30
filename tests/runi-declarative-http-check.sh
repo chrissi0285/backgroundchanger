@@ -40,7 +40,7 @@ fi
 
 body=$(mktemp /tmp/backgroundchanger-http-contract-response.XXXXXX)
 password=$(openssl rand -hex 24)
-OC_PASS=$password nc user:add --password-from-env --display-name 'ImageChanger contract test' "$uid" >/dev/null
+OC_PASS=$password nc user:add --password-from-env --display-name 'BackgroundChanger contract test' "$uid" >/dev/null
 created=true
 
 request() {

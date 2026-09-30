@@ -19,6 +19,8 @@ node --check js/background.js
 node --check js/settings.js
 node --check tests/browser-test.mjs
 node --test tests/settings-test.mjs tests/http-check-test.mjs
+node tests/attribution-test.mjs
+python3 tests/release-test.py
 bash -n tests/runi-install.sh
 bash -n tests/runi-declarative-http-check.sh
 xmllint --noout appinfo/info.xml
@@ -34,13 +36,13 @@ if grep -R -n -E 'SPDX-FileCopyrightText: 2026 (Christian|Chrissi)|<author[^>]*>
 fi
 
 grep -q '<id>backgroundchanger</id>' appinfo/info.xml
-grep -q '<name>ImageChanger</name>' appinfo/info.xml
+grep -q '<name>BackgroundChanger</name>' appinfo/info.xml
 grep -q '<namespace>BackgroundChanger</namespace>' appinfo/info.xml
 grep -q '<author homepage="https://github.com/chrissi0285">chrissi0285</author>' appinfo/info.xml
 grep -q 'Source-SHA256: 867c66e8d84bc2ee279fa2a85a6a4659160db9091c6a18ae01566aa7de2a3e99' img/app.svg
 grep -q 'designed by chrissi0285' js/background.js
 
-if grep -R -n -F 'Background Changer' appinfo css img js lib README.md CHANGELOG.md; then
+if grep -R -n -E 'ImageChanger|Bildwechsler|Background Changer' appinfo css img js lib README.md; then
 	printf '%s\n' 'The retired visible product name remains in public files.' >&2
 	exit 1
 fi

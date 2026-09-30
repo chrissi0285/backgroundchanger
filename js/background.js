@@ -239,7 +239,7 @@
 			document.documentElement.dataset.backgroundchangerReady = background.id
 		} catch (error) {
 			if (error?.name !== 'AbortError' && !controller.signal.aborted) {
-				console.debug('ImageChanger: local background unavailable')
+				console.debug('BackgroundChanger: local background unavailable')
 			}
 		} finally {
 			window.clearTimeout(timeout)

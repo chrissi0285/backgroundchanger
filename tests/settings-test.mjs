@@ -26,7 +26,7 @@ function fixture({ failure = 'http', oc = true } = {}) {
 	}
 	const radios = ['default', 'off', 'landscapes', 'animals', 'space', 'architecture'].map(value => new Input(value))
 	const field = {
-		closest: () => ({ textContent: 'ImageChanger' }),
+		closest: () => ({ textContent: 'BackgroundChanger' }),
 		querySelectorAll: () => radios,
 		querySelector: () => messages[0] || null,
 		appendChild: message => messages.push(message),

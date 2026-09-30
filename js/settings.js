@@ -22,7 +22,7 @@
 		if (values.size !== themes.size || ![...themes].every(theme => values.has(theme))) {
 			return null
 		}
-		return section.textContent?.includes('ImageChanger') ? field : null
+		return section.textContent?.includes('BackgroundChanger') ? field : null
 	}
 
 	function notifyFailure(field) {
@@ -33,7 +33,7 @@
 			message.setAttribute('role', 'alert')
 			field.appendChild(message)
 		}
-		message.textContent = 'ImageChanger could not save the theme. Please try again.'
+		message.textContent = 'BackgroundChanger could not save the theme. Please try again.'
 	}
 
 	function radioFromClick(target) {
