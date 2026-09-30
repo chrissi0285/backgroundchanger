@@ -18,9 +18,13 @@ const ROTATION_INTERVAL_MS = 5 * 60 * 1000
 
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
 const targets = await fetch(`${debuggerBase}/json/list`).then(response => response.json())
-const target = targets.find(candidate => candidate.type === 'page')
+const pages = targets.filter(candidate => candidate.type === 'page')
+const targetId = process.env.BACKGROUNDCHANGER_TEST_TARGET_ID
+const target = targetId
+	? pages.find(candidate => candidate.id === targetId)
+	: (pages.length === 1 ? pages[0] : undefined)
 if (!target?.webSocketDebuggerUrl) {
-	throw new Error('No Chrome page target available')
+	throw new Error('Provide a dedicated Chrome page via BACKGROUNDCHANGER_TEST_TARGET_ID when sharing a browser')
 }
 
 const socket = new WebSocket(target.webSocketDebuggerUrl)
@@ -345,7 +349,7 @@ async function personalBackgroundControl() {
 	return evaluate(`(async () => {
 		const section = document.querySelector('.settings-section.background')
 		if (!section) return null
-		const button = [...section.querySelectorAll('button[aria-label]')]
+		const button = [...section.querySelectorAll('button[aria-label], button[title]')]
 			.find(candidate => candidate.getAttribute('aria-pressed') !== 'true'
 				&& getComputedStyle(candidate).backgroundImage.includes('/apps/theming/img/background/preview/'))
 		if (!button) return null
@@ -357,7 +361,7 @@ async function personalBackgroundControl() {
 		const y = bounds.top + bounds.height / 2
 		const hit = document.elementFromPoint(x, y)
 		if (!(hit === button || button.contains(hit))) return null
-		return { x, y, ariaLabel: button.getAttribute('aria-label') || '' }
+		return { x, y, ariaLabel: button.getAttribute('aria-label') || button.getAttribute('title') || '' }
 	})()`)
 }
 
@@ -1024,7 +1028,7 @@ if (mode === 'settings' || mode === 'settings-inspect') {
 	assert(personalResponses.length === 1 && personalResponses[0].status === 200,
 		'The Nextcloud personal background write must receive HTTP 200')
 	await waitFor(`[...document.querySelectorAll('.settings-section.background button[aria-pressed="true"]')]
-		.some(button => button.getAttribute('aria-label') === ${JSON.stringify(personalTarget.ariaLabel)})`)
+		.some(button => (button.getAttribute('aria-label') || button.getAttribute('title')) === ${JSON.stringify(personalTarget.ariaLabel)})`)
 	await screenshot('nextcloud-personal-background-setting')
 
 	const selectionsBeforePersonalPage = requests.filter(url => url.includes('/apps/backgroundchanger/api/background')).length
@@ -1330,7 +1334,7 @@ const selectionsAfterSpa = requests.filter(url => url.includes('/apps/background
 
 assert(login.id !== dashboard.id, 'Login and dashboard must use different images')
 assert(dashboard.id !== dashboardRepeated.id, 'Repeated Dashboard menu click must use a different image')
-assert(dashboard.id !== files.id, 'Dashboard and Files must use different images')
+assert(dashboardRepeated.id !== files.id, 'The current dashboard image and Files must use different images')
 assert(files.creditText.length > 0, 'Files page must show attribution')
 assert(files.id !== spa.id, 'Files SPA navigation must use a different image')
 assert(spa.creditText.length > 0, 'Files SPA page must show attribution')

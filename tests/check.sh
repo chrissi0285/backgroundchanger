@@ -13,11 +13,12 @@ while IFS= read -r -d '' file; do
 done < <(find appinfo lib tests -type f -name '*.php' -print0 | sort -z)
 
 php tests/unit.php
-# tests/cache.php needs the real Nextcloud 34 interfaces and is run by the
+# tests/cache.php needs the real supported Nextcloud interfaces and is run by the
 # isolated integration harness after loading Nextcloud's bootstrap.
 node --check js/background.js
 node --check js/settings.js
 node --check tests/browser-test.mjs
+node --test tests/settings-test.mjs tests/http-check-test.mjs
 bash -n tests/runi-install.sh
 bash -n tests/runi-declarative-http-check.sh
 xmllint --noout appinfo/info.xml
